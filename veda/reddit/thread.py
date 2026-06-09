@@ -148,6 +148,28 @@ def extract_comments(listing: dict[str, Any] | None, depth: int = 0) -> list[Com
 def _normalize_html_comments(comments: list[dict], depth: int = 0) -> list[Comment]:
     out: list[Comment] = []
     for comment in comments or []:
+        if comment.get("_type") == "more":
+            out.append(
+                {
+                    "_type": "more",
+                    "count": comment.get("count", 0),
+                    "depth": depth,
+                    "more_ids": comment.get("more_ids", [])[:20],
+                    "_note": f"{comment.get('count', 0)} more replies collapsed.",
+                    "id": "",
+                    "author": "",
+                    "body": "",
+                    "score": 0,
+                    "created_utc": 0,
+                    "parent_id": "",
+                    "permalink": "",
+                    "is_op": False,
+                    "edited": False,
+                    "gilded": 0,
+                    "replies": [],
+                }
+            )
+            continue
         out.append(
             {
                 "id": comment.get("id", ""),
@@ -215,7 +237,7 @@ def _shape_html_result(
         "upvote_ratio": post_in.get("upvote_ratio", 0),
         "num_comments": post_in.get("num_comments", stats["fetched"]),
         "created_utc": post_in.get("created_utc", 0),
-        "permalink": html_url,
+        "permalink": post_in.get("permalink") or html_url,
         "url": post_in.get("url", html_url),
         "selftext": post_in.get("selftext", ""),
         "link_flair": post_in.get("link_flair"),

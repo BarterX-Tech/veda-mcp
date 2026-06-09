@@ -40,19 +40,22 @@ The Reddit thread ladder is JSON-first, then HTML fallback. M0 preserves the
 ported fetch ladder while M1+ make the HTML branch field-complete. Subreddit
 rules also fall back to old.reddit HTML when JSON is blocked or empty, and
 mobile `/s/` share links resolve through the stealth fetch path before
-normalization.
+normalization. Shared transport owns the request fingerprint, rate limiter, and
+bounded in-memory cache.
 
 `fetch_user` falls back per requested listing kind, so a working submitted JSON
 listing can be combined with an HTML comments fallback. `fetch_profile` returns
 the old.reddit bio text plus deduped non-Reddit external URLs.
 
-`fetch_url` honors robots.txt, chooses a static-first route for known lightweight
-hosts, escalates through stealth/dynamic HTML tiers when extracted text is thin,
-and caps returned text to `max_chars`.
+`fetch_url` honors robots.txt, fetches GitHub repository READMEs through the raw
+markdown path, chooses a static-first route for known lightweight hosts,
+escalates through stealth/dynamic HTML tiers when extracted text is thin, and
+caps returned text to `max_chars`.
 
 Health monitoring records per-tool calls, successes, errors, route counts,
-error codes, and average latency. Use the `health_status()` MCP tool or
-`scripts/veda-server status` against a running server.
+`.json` vs HTML ratio, error codes, and average latency. Use the
+`health_status()` MCP tool or `scripts/veda-server status` against a running
+server.
 
 ## MCP Client
 

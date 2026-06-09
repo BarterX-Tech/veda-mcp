@@ -63,3 +63,22 @@ def test_veda_import_boundary() -> None:
                     problems.append(f"{path.relative_to(ROOT)} imports {node.module}")
 
     assert not problems, "\n".join(problems)
+
+
+def test_veda_read_paths_do_not_write_files() -> None:
+    problems: list[str] = []
+    write_methods = {"write_text", "write_bytes", "mkdir", "unlink"}
+    write_modes = {"w", "a", "x", "w+", "a+", "x+"}
+
+    for path in sorted((ROOT / "veda").rglob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Attribute) and node.func.attr in write_methods:
+                    problems.append(f"{path.relative_to(ROOT)} calls {node.func.attr}()")
+                if isinstance(node.func, ast.Name) and node.func.id == "open":
+                    mode = node.args[1] if len(node.args) > 1 else None
+                    if isinstance(mode, ast.Constant) and str(mode.value) in write_modes:
+                        problems.append(f"{path.relative_to(ROOT)} opens a file in {mode.value!r}")
+
+    assert not problems, "\n".join(problems)

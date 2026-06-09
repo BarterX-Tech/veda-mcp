@@ -99,6 +99,7 @@ def fetch_url(
     max_chars: int = DEFAULT_MAX_CHARS,
     fetch_html=None,
     robots_check=None,
+    raw_fetcher=None,
 ) -> ExternalDoc:
     if fetch_html is None:
         fetch_html = _default_fetch_html
@@ -107,6 +108,20 @@ def fetch_url(
             return robots_allowed(target, fetch_robots=transport_fetch_html)
     if not robots_check(url):
         raise Blocked(f"robots.txt disallows {url}")
+
+    raw_url = github_raw_readme_url(url)
+    if raw_url:
+        if raw_fetcher is None:
+            raw_fetcher = transport_fetch_html
+        text = raw_fetcher(raw_url) or ""
+        if text.strip():
+            return {
+                "url": url,
+                "status": 200,
+                "route": "github_raw",
+                "content_type": "text/markdown",
+                "text": text[:max_chars],
+            }
 
     start = route_start_tier(url)
     sequence = _TIER_ORDER[_TIER_ORDER.index(start) :]

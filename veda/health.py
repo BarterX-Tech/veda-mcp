@@ -73,6 +73,15 @@ def snapshot() -> dict:
     return {
         "tools": tools,
         "routes": dict(sorted(route_totals.items())),
+        "json_vs_html": {
+            "json": route_totals.get("json", 0),
+            "html": route_totals.get("html", 0),
+            "html_ratio": round(
+                route_totals.get("html", 0)
+                / max(route_totals.get("json", 0) + route_totals.get("html", 0), 1),
+                3,
+            ),
+        },
         "totals": {
             "calls": total_calls,
             "successes": total_successes,

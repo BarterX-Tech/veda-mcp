@@ -5,6 +5,7 @@ import re
 import sys
 import threading
 import time
+from collections import OrderedDict
 from typing import Any
 
 import requests
@@ -43,6 +44,45 @@ THREAD_RETRY_DELAYS = (2, 4, 8)
 JsonValue = dict[str, Any] | list[Any]
 
 
+class MemoryCache:
+    def __init__(self, max_entries: int = 256, ttl_seconds: float = 300.0) -> None:
+        self.max_entries = max_entries
+        self.ttl_seconds = ttl_seconds
+        self._lock = threading.Lock()
+        self._items: OrderedDict[str, tuple[float, Any]] = OrderedDict()
+
+    def get(self, key: str) -> Any | None:
+        with self._lock:
+            item = self._items.get(key)
+            if item is None:
+                return None
+            expires_at, value = item
+            if expires_at < time.monotonic():
+                self._items.pop(key, None)
+                return None
+            self._items.move_to_end(key)
+            return value
+
+    def set(self, key: str, value: Any) -> None:
+        with self._lock:
+            self._items[key] = (time.monotonic() + self.ttl_seconds, value)
+            self._items.move_to_end(key)
+            while len(self._items) > self.max_entries:
+                self._items.popitem(last=False)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
+
+    def snapshot(self) -> dict[str, int | float]:
+        with self._lock:
+            return {
+                "size": len(self._items),
+                "max_entries": self.max_entries,
+                "ttl_seconds": self.ttl_seconds,
+            }
+
+
 class RateLimiter:
     def __init__(self, min_interval: float = 0.75) -> None:
         self.min_interval = min_interval
@@ -59,6 +99,15 @@ class RateLimiter:
 
 
 rate_limiter = RateLimiter()
+cache = MemoryCache()
+
+
+def clear_cache() -> None:
+    cache.clear()
+
+
+def cache_snapshot() -> dict[str, int | float]:
+    return cache.snapshot()
 
 
 def parse_text(text: str | None) -> JsonValue | None:
@@ -191,10 +240,15 @@ def _json_tier3(url: str) -> JsonValue | None:
 
 
 def fetch_json(url: str) -> JsonValue | None:
+    cache_key = f"json:{url}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     for tier in (_json_tier1, _json_tier2, _json_tier3):
         try:
             data = tier(url)
             if data is not None:
+                cache.set(cache_key, data)
                 return data
         except Exception as exc:
             sys.stderr.write(f"[veda.transport] {tier.__name__} failed: {exc!r}\n")
@@ -220,10 +274,15 @@ def _html_tier3(url: str) -> str | None:
 
 
 def fetch_html(url: str) -> str | None:
+    cache_key = f"html:{url}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     for tier in (_html_tier1, _html_tier2, _html_tier3):
         try:
             html = tier(url)
             if html:
+                cache.set(cache_key, html)
                 return html
         except Exception as exc:
             sys.stderr.write(f"[veda.transport] {tier.__name__} failed: {exc!r}\n")

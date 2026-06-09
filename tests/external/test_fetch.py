@@ -57,6 +57,22 @@ def test_fetch_url_escalates_until_readable_text() -> None:
     assert "good content" in doc["text"]
 
 
+def test_fetch_url_uses_github_raw_readme() -> None:
+    doc = fetch.fetch_url(
+        "https://github.com/owner/repo",
+        raw_fetcher=lambda url: "README markdown",
+        robots_check=lambda url: True,
+    )
+
+    assert doc == {
+        "url": "https://github.com/owner/repo",
+        "status": 200,
+        "route": "github_raw",
+        "content_type": "text/markdown",
+        "text": "README markdown",
+    }
+
+
 def test_fetch_url_blocks_when_robots_disallow() -> None:
     with pytest.raises(Blocked):
         fetch.fetch_url(
