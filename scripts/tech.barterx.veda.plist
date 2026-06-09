@@ -25,8 +25,8 @@
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/nitinkhanna/Documents/Services/Veda/logs/veda-server.log</string>
+  <string>/Users/nitinkhanna/Library/Logs/veda-server.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/nitinkhanna/Documents/Services/Veda/logs/veda-server.log</string>
+  <string>/Users/nitinkhanna/Library/Logs/veda-server.log</string>
 </dict>
 </plist>
