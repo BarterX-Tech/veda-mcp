@@ -1,0 +1,1 @@
+"""MCP shell for veda."""
