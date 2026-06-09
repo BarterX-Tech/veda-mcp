@@ -11,6 +11,7 @@ from veda.reddit import profile as reddit_profile
 from veda.reddit import rules as reddit_rules
 from veda.reddit import thread as reddit_thread
 from veda.reddit import user as reddit_user
+from veda.security import SlidingWindowRateLimiter
 
 
 class ToolError(Exception):
@@ -71,6 +72,33 @@ TOOL_HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "health_status": _health_status,
 }
 
+TOOL_RATE_LIMITS: dict[str, tuple[int, float]] = {
+    "fetch_thread": (30, 60.0),
+    "fetch_user": (20, 60.0),
+    "fetch_profile": (60, 60.0),
+    "fetch_rules": (60, 60.0),
+    "fetch_url": (30, 60.0),
+    "health_status": (120, 60.0),
+}
+_TOOL_LIMITERS = {
+    name: SlidingWindowRateLimiter(limit, window)
+    for name, (limit, window) in TOOL_RATE_LIMITS.items()
+}
+
+
+def reset_rate_limits() -> None:
+    for limiter in _TOOL_LIMITERS.values():
+        limiter.reset()
+
+
+def _check_tool_rate_limit(name: str) -> None:
+    limiter = _TOOL_LIMITERS.get(name)
+    if limiter is not None:
+        try:
+            limiter.check()
+        except VedaError as exc:
+            raise ToolError(str(exc), code=exc.code) from exc
+
 
 def _route_for_result(result: Any) -> str:
     if isinstance(result, dict):
@@ -87,7 +115,17 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> Any:
         raise ToolError(f"Unknown tool: {name}", code="unknown_tool")
     started = time.monotonic()
     try:
+        _check_tool_rate_limit(name)
         result = await TOOL_HANDLERS[name](arguments or {})
+    except ToolError as exc:
+        health.record(
+            name,
+            route="security",
+            outcome="error",
+            latency_ms=(time.monotonic() - started) * 1000,
+            error_code=exc.code,
+        )
+        raise
     except VedaError as exc:
         health.record(
             name,

@@ -80,7 +80,19 @@ Underscore-prefixed modules are internal; only sub-package `__init__` names are 
 - **Boundary test** (veda's own suite): AST-scan `veda/**/*.py`; fail on any import outside veda's allowed dependency set (no project-specific imports).
 - **No inbound knowledge:** tool inputs are plain values; veda never receives or stores caller context.
 
-### 1.5 The fetch ladder (inside `_transport`)
+### 1.5 Local always-on security posture
+Local veda is intended to run 24/7 for local agents, but only as a loopback service.
+
+- **Bind address:** default `VEDA_HOST=127.0.0.1`. Local launchd/service mode must not bind to `0.0.0.0`.
+- **Bearer auth:** if `VEDA_AUTH_TOKEN` is present, every MCP request must include `Authorization: Bearer <token>`. Browser-style `GET /mcp` remains a public local status page; actual MCP traffic is token-gated.
+- **Token storage:** `scripts/veda-server` generates a token in `run/veda-token` (`0600`, ignored by git) when no `VEDA_AUTH_TOKEN` is provided. The launchd unit receives `VEDA_TOKEN_FILE` and the Python server reads that token at startup.
+- **Client config:** local MCP clients should read `run/veda-token` or be configured with the same `VEDA_AUTH_TOKEN`.
+- **SSRF guard:** `fetch_url` accepts only `http`/`https` URLs whose host resolves to public IPs. It blocks localhost, `.local`, private, loopback, link-local, multicast, reserved, and otherwise non-global addresses.
+- **Tool throttling:** the MCP dispatcher applies conservative per-tool sliding-window limits before calling the core. Transport-level pacing still controls platform-facing request cadence.
+- **Logs:** launchd logs write to `~/Library/Logs/veda-server.log`, avoiding macOS Documents privacy blocks and keeping service logs out of git.
+- **Stop/status:** `scripts/veda-server stop` must stop the launchd service when loaded; `status` must call `health_status` with the local bearer token.
+
+### 1.6 The fetch ladder (inside `_transport`)
 ```text
 .json tier1 (requests, old.reddit/.json)     ┐ .json routes are Cloudflare-gated →
   → tier2 (StealthyFetcher on .json)          │ fail in practice (kept as-is for now; see §8)
@@ -173,13 +185,14 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - **MCP-tool test (shell):** call each tool against an in-process server fixture; args→kwargs, results = §3 shapes, `VedaError`→MCP error with `.code`.
 - **Contract test:** every tool result is JSON-serializable (it crosses the wire).
 - **Health test:** metrics increment correctly per route/outcome.
+- **Security tests:** bearer-token middleware blocks unauthenticated MCP traffic; `fetch_url` rejects localhost/private DNS targets; tool dispatcher reports `rate_limited`.
 
 ---
 
 ## 8. Open / deferred
 - **`.json`-drop** — deferred until M5 health data (§6).
 - **Multi-platform interface** — deferred until a second platform exists.
-- **Remote deploy + auth** — later (the MCP HTTP server is already the service shape).
+- **Remote deploy + production auth** — later (local bearer auth exists; remote hosting still needs HTTPS/domain and stronger auth policy).
 
 ---
 
@@ -225,6 +238,15 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - [ ] Status surface (tool/endpoint + `/veda-server status`); README health section
 - [ ] PR: M5 — *informs the later `.json`-drop decision*
 
+### M6 — Local security hardening
+- [ ] Keep local service bound to `127.0.0.1`
+- [ ] Add optional bearer-token auth for MCP traffic
+- [ ] Generate/store local token outside git for launchd and script starts
+- [ ] Block private/internal targets in `fetch_url`
+- [ ] Add per-tool sliding-window limits at the MCP dispatcher
+- [ ] Update `scripts/veda-server stop/status` for launchd + token-aware health checks
+- [ ] Tests + README/PRD updates
+
 ### Later (separate effort)
 - [ ] `.json`-drop decision using M5 data
-- [ ] Deploy the MCP server to a real host (flip `localhost` → host + auth)
+- [ ] Deploy the MCP server to a real host (flip `localhost` → host + production auth)

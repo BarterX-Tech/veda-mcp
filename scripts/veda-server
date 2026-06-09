@@ -9,6 +9,9 @@ PID_DIR="$ROOT/run"
 LOG_DIR="$ROOT/logs"
 PID_FILE="$PID_DIR/veda-server.pid"
 LOG_FILE="$LOG_DIR/veda-server.log"
+TOKEN_FILE="${VEDA_TOKEN_FILE:-$PID_DIR/veda-token}"
+PLIST="$ROOT/scripts/tech.barterx.veda.plist"
+LABEL="tech.barterx.veda"
 
 usage() {
   echo "usage: scripts/veda-server {start|stop|status}"
@@ -18,6 +21,36 @@ is_running() {
   [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
 
+ensure_token() {
+  if [[ -n "${VEDA_AUTH_TOKEN:-}" ]]; then
+    return
+  fi
+  mkdir -p "$PID_DIR"
+  if [[ -f "$TOKEN_FILE" ]]; then
+    VEDA_AUTH_TOKEN="$(cat "$TOKEN_FILE")"
+    export VEDA_AUTH_TOKEN
+    return
+  fi
+  umask 077
+  VEDA_AUTH_TOKEN="$("$PYTHON" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(32))
+PY
+)"
+  printf '%s\n' "$VEDA_AUTH_TOKEN" > "$TOKEN_FILE"
+  export VEDA_AUTH_TOKEN
+}
+
+auth_headers_py() {
+  cat <<PY
+headers = {"Authorization": "Bearer $VEDA_AUTH_TOKEN"} if "$VEDA_AUTH_TOKEN" else None
+PY
+}
+
+launchd_loaded() {
+  launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1
+}
+
 case "${1:-}" in
   start)
     mkdir -p "$PID_DIR" "$LOG_DIR"
@@ -25,15 +58,32 @@ case "${1:-}" in
       echo "veda server already running on http://$HOST:$PORT (pid $(cat "$PID_FILE"))"
       exit 0
     fi
+    if [[ "$(uname -s)" == "Darwin" && -f "$PLIST" && "${VEDA_NO_LAUNCHD:-}" != "1" ]]; then
+      ensure_token
+      if ! launchd_loaded; then
+        launchctl bootstrap "gui/$(id -u)" "$PLIST"
+      fi
+      echo "veda server launchd service active on http://$HOST:$PORT"
+      echo "auth token file: $TOKEN_FILE"
+      exit 0
+    fi
     if [[ ! -x "$PYTHON" ]]; then
       echo "missing venv python at $PYTHON; run: uv venv --python /Users/nitinkhanna/.local/bin/python3.11 && uv pip install -e '.[dev]'"
       exit 1
     fi
+    ensure_token
     VEDA_HOST="$HOST" VEDA_PORT="$PORT" nohup "$PYTHON" -m veda.mcp.server >"$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     echo "veda server started on http://$HOST:$PORT (pid $(cat "$PID_FILE"))"
+    echo "auth token file: $TOKEN_FILE"
     ;;
   stop)
+    if [[ "$(uname -s)" == "Darwin" ]] && launchd_loaded; then
+      launchctl bootout "gui/$(id -u)/$LABEL"
+      rm -f "$PID_FILE"
+      echo "veda server launchd service stopped"
+      exit 0
+    fi
     if is_running; then
       kill "$(cat "$PID_FILE")"
       rm -f "$PID_FILE"
@@ -44,6 +94,7 @@ case "${1:-}" in
     fi
     ;;
   status)
+    ensure_token
     if is_running; then
       echo "running http://$HOST:$PORT pid=$(cat "$PID_FILE")"
       "$PYTHON" - <<PY 2>/dev/null || echo "health unavailable"
@@ -51,9 +102,28 @@ import anyio
 import json
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
+$(auth_headers_py)
 
 async def main():
-    async with streamablehttp_client("http://$HOST:$PORT/mcp") as (read, write, _):
+    async with streamablehttp_client("http://$HOST:$PORT/mcp", headers=headers) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("health_status", {})
+            print(result.content[0].text if result.content else json.dumps({}))
+
+anyio.run(main)
+PY
+    elif [[ "$(uname -s)" == "Darwin" ]] && launchd_loaded; then
+      launchctl print "gui/$(id -u)/$LABEL" | sed -n '1,80p'
+      "$PYTHON" - <<PY 2>/dev/null || echo "health unavailable"
+import anyio
+import json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+$(auth_headers_py)
+
+async def main():
+    async with streamablehttp_client("http://$HOST:$PORT/mcp", headers=headers) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool("health_status", {})

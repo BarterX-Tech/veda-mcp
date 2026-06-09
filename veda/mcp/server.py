@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable
+from hmac import compare_digest
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -96,6 +97,45 @@ class BrowserHomePage:
         return "text/html" in accept and "text/event-stream" not in accept
 
 
+class BearerTokenAuth:
+    def __init__(self, app: AsgiApp, *, token: str | None, public_app: BrowserHomePage) -> None:
+        self.app = app
+        self.token = token
+        self.public_app = public_app
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if not self.token or scope.get("type") != "http":
+            await self.public_app(scope, receive, send)
+            return
+        if self.public_app._is_browser_home_request(scope):
+            await self.public_app(scope, receive, send)
+            return
+        if self._authorized(scope):
+            await self.app(scope, receive, send)
+            return
+        body = b'{"error":"unauthorized"}'
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                    (b"www-authenticate", b"Bearer"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
+
+    def _authorized(self, scope: dict[str, Any]) -> bool:
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        auth = headers.get(b"authorization", b"").decode(errors="ignore")
+        prefix = "Bearer "
+        if not auth.startswith(prefix):
+            return False
+        return compare_digest(auth[len(prefix) :], self.token or "")
+
+
 def create_server() -> FastMCP:
     server = FastMCP("veda")
 
@@ -149,9 +189,26 @@ def _install_browser_home_page(server: FastMCP) -> None:
     original = server.streamable_http_app
 
     def streamable_http_app():
-        return BrowserHomePage(original(), path=server.settings.streamable_http_path)
+        mcp_app = original()
+        home_app = BrowserHomePage(mcp_app, path=server.settings.streamable_http_path)
+        return BearerTokenAuth(
+            mcp_app,
+            token=_auth_token(),
+            public_app=home_app,
+        )
 
     server.streamable_http_app = streamable_http_app
+
+
+def _auth_token() -> str | None:
+    if os.environ.get("VEDA_AUTH_TOKEN"):
+        return os.environ["VEDA_AUTH_TOKEN"]
+    token_file = os.environ.get("VEDA_TOKEN_FILE", "run/veda-token")
+    try:
+        token = open(token_file).read().strip()
+    except OSError:
+        return None
+    return token or None
 
 
 def main() -> None:

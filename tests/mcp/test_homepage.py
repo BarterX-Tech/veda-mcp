@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import anyio
 
-from veda.mcp.server import BrowserHomePage
+from veda.mcp.server import BearerTokenAuth, BrowserHomePage
 
 
-async def _call_app(app, accept: bytes) -> tuple[int, bytes, bytes]:
+async def _call_app(
+    app,
+    accept: bytes,
+    method: str = "GET",
+    authorization: bytes | None = None,
+) -> tuple[int, bytes, bytes]:
     messages = []
 
     async def receive():
@@ -14,12 +19,16 @@ async def _call_app(app, accept: bytes) -> tuple[int, bytes, bytes]:
     async def send(message):
         messages.append(message)
 
+    headers = [(b"accept", accept)]
+    if authorization is not None:
+        headers.append((b"authorization", authorization))
+
     await app(
         {
             "type": "http",
-            "method": "GET",
+            "method": method,
             "path": "/mcp",
-            "headers": [(b"accept", accept)],
+            "headers": headers,
         },
         receive,
         send,
@@ -62,3 +71,42 @@ def test_mcp_stream_get_is_delegated() -> None:
 
     assert status == 204
     assert called["value"] is True
+
+
+def test_bearer_auth_blocks_mcp_without_token() -> None:
+    async def fallback(scope, receive, send):
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    home = BrowserHomePage(fallback, path="/mcp")
+    app = BearerTokenAuth(fallback, token="secret", public_app=home)
+
+    status, content_type, body = anyio.run(
+        _call_app,
+        app,
+        b"application/json",
+        "POST",
+    )
+
+    assert status == 401
+    assert content_type == b"application/json"
+    assert b"unauthorized" in body
+
+
+def test_bearer_auth_allows_mcp_with_token() -> None:
+    async def fallback(scope, receive, send):
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    home = BrowserHomePage(fallback, path="/mcp")
+    app = BearerTokenAuth(fallback, token="secret", public_app=home)
+
+    status, _, _ = anyio.run(
+        _call_app,
+        app,
+        b"application/json",
+        "POST",
+        b"Bearer secret",
+    )
+
+    assert status == 204

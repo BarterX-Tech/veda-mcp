@@ -24,8 +24,17 @@ Defaults:
 - `VEDA_HOST=127.0.0.1`
 - `VEDA_PORT=8765`
 - Streamable HTTP endpoint: `http://127.0.0.1:8765/mcp`
+- Local bearer token file: `run/veda-token`
 
 Launchd plist: `scripts/tech.barterx.veda.plist`.
+
+`scripts/veda-server start` generates a local token if `VEDA_AUTH_TOKEN` is not
+already set. The token is ignored by git and used by `scripts/veda-server status`
+automatically. MCP clients should send:
+
+```text
+Authorization: Bearer <contents of run/veda-token>
+```
 
 ## MCP Tools
 
@@ -47,10 +56,14 @@ bounded in-memory cache.
 listing can be combined with an HTML comments fallback. `fetch_profile` returns
 the old.reddit bio text plus deduped non-Reddit external URLs.
 
-`fetch_url` honors robots.txt, fetches GitHub repository READMEs through the raw
-markdown path, chooses a static-first route for known lightweight hosts,
-escalates through stealth/dynamic HTML tiers when extracted text is thin, and
-caps returned text to `max_chars`.
+`fetch_url` honors robots.txt, blocks localhost/private-network targets, fetches
+GitHub repository READMEs through the raw markdown path, chooses a static-first
+route for known lightweight hosts, escalates through stealth/dynamic HTML tiers
+when extracted text is thin, and caps returned text to `max_chars`.
+
+The MCP dispatcher applies conservative per-tool rate limits before calling the
+core. The shared transport still owns platform-facing pacing and the bounded
+in-memory cache.
 
 Health monitoring records per-tool calls, successes, errors, route counts,
 `.json` vs HTML ratio, error codes, and average latency. Use the
@@ -64,6 +77,9 @@ Point an MCP Streamable HTTP client at:
 ```text
 http://127.0.0.1:8765/mcp
 ```
+
+If `run/veda-token` exists, configure the client with an `Authorization: Bearer`
+header using that token.
 
 For Claude slash-command setups, use `scripts/veda-server.md` as the thin
 `/veda-server` wrapper.

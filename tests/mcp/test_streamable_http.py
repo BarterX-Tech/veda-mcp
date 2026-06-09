@@ -20,10 +20,16 @@ def _free_port() -> int:
 
 def test_streamable_http_server_lists_and_calls_status_tool() -> None:
     port = _free_port()
-    env = {**os.environ, "VEDA_HOST": "127.0.0.1", "VEDA_PORT": str(port)}
+    root = Path(__file__).resolve().parents[2]
+    env = {
+        **os.environ,
+        "VEDA_HOST": "127.0.0.1",
+        "VEDA_PORT": str(port),
+        "VEDA_TOKEN_FILE": os.fspath(root / "run" / "test-no-token"),
+    }
     process = subprocess.Popen(
         [sys.executable, "-m", "veda.mcp.server"],
-        cwd=os.fspath(Path(__file__).resolve().parents[2]),
+        cwd=os.fspath(root),
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

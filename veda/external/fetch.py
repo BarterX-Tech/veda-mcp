@@ -9,6 +9,7 @@ from veda._transport import _html_tier1, _html_tier2, _html_tier3
 from veda._transport import fetch_html as transport_fetch_html
 from veda.errors import Blocked
 from veda.reddit.types import ExternalDoc
+from veda.security import validate_public_http_url
 
 MIN_CHARS = 100
 DEFAULT_MAX_CHARS = 20000
@@ -100,7 +101,9 @@ def fetch_url(
     fetch_html=None,
     robots_check=None,
     raw_fetcher=None,
+    security_check=validate_public_http_url,
 ) -> ExternalDoc:
+    security_check(url)
     if fetch_html is None:
         fetch_html = _default_fetch_html
     if robots_check is None:
@@ -111,6 +114,7 @@ def fetch_url(
 
     raw_url = github_raw_readme_url(url)
     if raw_url:
+        security_check(raw_url)
         if raw_fetcher is None:
             raw_fetcher = transport_fetch_html
         text = raw_fetcher(raw_url) or ""

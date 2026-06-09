@@ -373,9 +373,16 @@ Any MCP client should be configured with:
 ```text
 transport: streamable_http
 url: http://127.0.0.1:8765/mcp
+headers:
+  Authorization: Bearer <contents of run/veda-token>
 ```
 
 Remote deployments should use the deployed HTTPS endpoint once available.
+
+For local service mode, `scripts/veda-server start` generates `run/veda-token` when
+`VEDA_AUTH_TOKEN` is not already set. Clients running on the same machine should read that token
+or use the same environment variable. Browser-style `GET /mcp` is a human status page; MCP
+protocol calls should include the bearer header.
 
 ### 7.3 Concurrency
 

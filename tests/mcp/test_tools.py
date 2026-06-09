@@ -8,6 +8,7 @@ from veda import health
 from veda.errors import Blocked
 from veda.mcp import tools
 from veda.mcp.server import create_server
+from veda.security import SlidingWindowRateLimiter
 
 
 def test_tool_registry_has_five_tools() -> None:
@@ -61,6 +62,24 @@ def test_call_tool_maps_veda_error(monkeypatch) -> None:
     snapshot = health.snapshot()
     assert snapshot["tools"]["fetch_url"]["errors"] == 1
     assert snapshot["tools"]["fetch_url"]["error_codes"]["blocked"] == 1
+
+
+def test_call_tool_rate_limits(monkeypatch) -> None:
+    health.reset()
+    monkeypatch.setitem(
+        tools._TOOL_LIMITERS,
+        "health_status",
+        SlidingWindowRateLimiter(limit=1, window_seconds=60),
+    )
+
+    asyncio.run(tools.call_tool("health_status", {}))
+
+    with pytest.raises(tools.ToolError) as exc:
+        asyncio.run(tools.call_tool("health_status", {}))
+
+    assert exc.value.code == "rate_limited"
+    snapshot = health.snapshot()
+    assert snapshot["tools"]["health_status"]["error_codes"]["rate_limited"] == 1
 
 
 def test_fastmcp_server_lists_and_calls_all_tools(monkeypatch) -> None:

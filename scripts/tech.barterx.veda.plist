@@ -19,6 +19,8 @@
     <string>127.0.0.1</string>
     <key>VEDA_PORT</key>
     <string>8765</string>
+    <key>VEDA_TOKEN_FILE</key>
+    <string>/Users/nitinkhanna/Documents/Services/Veda/run/veda-token</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

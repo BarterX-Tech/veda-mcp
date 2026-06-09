@@ -51,6 +51,7 @@ def test_fetch_url_escalates_until_readable_text() -> None:
         "https://github.com/owner/repo",
         fetch_html=lambda url, tier: pages[tier],
         robots_check=lambda url: True,
+        security_check=lambda url: None,
     )
 
     assert doc["route"] == "tier2"
@@ -62,6 +63,7 @@ def test_fetch_url_uses_github_raw_readme() -> None:
         "https://github.com/owner/repo",
         raw_fetcher=lambda url: "README markdown",
         robots_check=lambda url: True,
+        security_check=lambda url: None,
     )
 
     assert doc == {
@@ -79,4 +81,27 @@ def test_fetch_url_blocks_when_robots_disallow() -> None:
             "https://example.com/private",
             fetch_html=lambda url, tier: "<article>ok</article>",
             robots_check=lambda url: False,
+            security_check=lambda url: None,
+        )
+
+
+def test_fetch_url_blocks_localhost_target() -> None:
+    with pytest.raises(Blocked):
+        fetch.fetch_url(
+            "http://127.0.0.1:8080/private",
+            fetch_html=lambda url, tier: "<article>ok</article>",
+            robots_check=lambda url: True,
+        )
+
+
+def test_fetch_url_blocks_private_dns_target() -> None:
+    def resolver(host, port, type):
+        return [(None, None, None, "", ("192.168.1.20", port))]
+
+    with pytest.raises(Blocked):
+        fetch.fetch_url(
+            "https://internal.example.test/private",
+            fetch_html=lambda url, tier: "<article>ok</article>",
+            robots_check=lambda url: True,
+            security_check=lambda url: fetch.validate_public_http_url(url, resolver=resolver),
         )

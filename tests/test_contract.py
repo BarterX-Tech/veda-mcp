@@ -65,7 +65,7 @@ def test_other_core_results_are_json_serializable(monkeypatch) -> None:
         fetch_user("alice"),
         fetch_profile("alice"),
         fetch_rules("macapps"),
-        fetch_url("https://example.com", max_chars=80),
+        fetch_url("https://example.com", max_chars=80, security_check=lambda url: None),
     ]
 
     for result in results:
