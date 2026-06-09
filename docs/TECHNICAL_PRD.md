@@ -52,7 +52,7 @@ Veda/
   .github/workflows/      # CI: tests + boundary + contract on every push
   scripts/
     veda-server           # start/stop/status entrypoint (backs /veda-server + launchd)
-    com.barterx.veda.plist# launchd unit for the local always-on server
+    tech.barterx.veda.plist# launchd unit for the local always-on server
   veda/
     __init__.py
     _transport.py         # fingerprint/headers, StealthyFetcher wrappers, rate-limiter, .json/HTML tier ladder

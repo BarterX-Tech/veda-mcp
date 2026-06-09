@@ -25,7 +25,7 @@ Defaults:
 - `VEDA_PORT=8765`
 - Streamable HTTP endpoint: `http://127.0.0.1:8765/mcp`
 
-Launchd plist: `scripts/com.barterx.veda.plist`.
+Launchd plist: `scripts/tech.barterx.veda.plist`.
 
 ## MCP Tools
 
