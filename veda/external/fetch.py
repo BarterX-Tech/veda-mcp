@@ -7,6 +7,7 @@ import lxml.html
 
 from veda._transport import _html_tier1, _html_tier2, _html_tier3
 from veda._transport import fetch_html as transport_fetch_html
+from veda.config import get_scraping_config
 from veda.errors import Blocked
 from veda.reddit.types import ExternalDoc
 from veda.security import validate_public_http_url
@@ -103,6 +104,7 @@ def fetch_url(
     raw_fetcher=None,
     security_check=validate_public_http_url,
 ) -> ExternalDoc:
+    config = get_scraping_config()
     security_check(url)
     if fetch_html is None:
         fetch_html = _default_fetch_html
@@ -113,7 +115,7 @@ def fetch_url(
         raise Blocked(f"robots.txt disallows {url}")
 
     raw_url = github_raw_readme_url(url)
-    if raw_url:
+    if raw_url and config.external_github_raw_enabled:
         security_check(raw_url)
         if raw_fetcher is None:
             raw_fetcher = transport_fetch_html
@@ -128,7 +130,13 @@ def fetch_url(
             }
 
     start = route_start_tier(url)
-    sequence = _TIER_ORDER[_TIER_ORDER.index(start) :]
+    sequence = [
+        tier
+        for tier in _TIER_ORDER[_TIER_ORDER.index(start) :]
+        if config.external_tier_enabled(tier)
+    ]
+    if not sequence:
+        raise Blocked(f"no enabled external fetch routes for {url}")
     best_text = ""
     best_tier = sequence[0]
     for tier in sequence:

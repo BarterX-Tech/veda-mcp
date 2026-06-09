@@ -3,6 +3,8 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 
+from veda.config import get_scraping_config
+
 
 @dataclass
 class ToolMetrics:
@@ -87,4 +89,5 @@ def snapshot() -> dict:
             "successes": total_successes,
             "errors": total_errors,
         },
+        "scraping_config": get_scraping_config().as_dict(),
     }

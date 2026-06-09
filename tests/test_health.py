@@ -18,5 +18,6 @@ def test_health_records_success_error_routes_and_latency() -> None:
     assert snapshot["routes"]["json"] == 1
     assert snapshot["routes"]["tier2"] == 1
     assert snapshot["json_vs_html"] == {"json": 1, "html": 1, "html_ratio": 0.5}
+    assert snapshot["scraping_config"]["reddit_json_enabled"] is False
     assert snapshot["tools"]["fetch_thread"]["avg_latency_ms"] == 10.0
     assert snapshot["tools"]["fetch_url"]["error_codes"]["blocked"] == 1

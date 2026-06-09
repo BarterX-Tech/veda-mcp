@@ -54,6 +54,8 @@ def test_parse_user_listing_posts_comments_and_after() -> None:
 
 
 def test_fetch_user_falls_back_per_kind(monkeypatch) -> None:
+    monkeypatch.setenv("VEDA_REDDIT_JSON_ENABLED", "1")
+
     def fake_json(url: str):
         if "/submitted.json" in url:
             return {

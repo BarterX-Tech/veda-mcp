@@ -29,7 +29,9 @@ def test_fetch_rules_falls_back_to_html_when_json_empty() -> None:
     ]
 
 
-def test_fetch_rules_uses_json_when_populated() -> None:
+def test_fetch_rules_uses_json_when_populated(monkeypatch) -> None:
+    monkeypatch.setenv("VEDA_REDDIT_JSON_ENABLED", "1")
+
     result = rules.fetch_rules(
         "macapps",
         json_fetcher=lambda subreddit: [{"short_name": "A", "description": "B"}],

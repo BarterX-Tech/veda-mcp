@@ -12,6 +12,7 @@ from veda._transport import (
     page_body,
     safe_fetch,
 )
+from veda.config import get_scraping_config
 from veda.errors import Blocked, ParseError
 from veda.reddit import _html_thread
 from veda.reddit.rules import fetch_rules
@@ -268,24 +269,27 @@ def fetch_thread(
     comment_limit: int = 500,
     comment_sort: str = "top",
 ) -> ThreadResult:
+    config = get_scraping_config()
     json_url = normalize_to_json_url(url)
     route = "json"
-    raw = fetch_json_tier1(json_url, comment_limit=comment_limit, comment_sort=comment_sort)
-    if not raw:
-        route = "json"
-        raw = fetch_json_tier2(
-            json_url.split("?")[0].replace(".json", ""),
-            comment_limit=comment_limit,
-            comment_sort=comment_sort,
-        )
-    if not raw:
-        route = "json"
-        raw = fetch_json_tier3(
-            json_url.split("?")[0].replace(".json", ""),
-            comment_limit=comment_limit,
-            comment_sort=comment_sort,
-        )
+    raw = None
+    if config.reddit_json_enabled:
+        raw = fetch_json_tier1(json_url, comment_limit=comment_limit, comment_sort=comment_sort)
+        if not raw:
+            raw = fetch_json_tier2(
+                json_url.split("?")[0].replace(".json", ""),
+                comment_limit=comment_limit,
+                comment_sort=comment_sort,
+            )
+        if not raw:
+            raw = fetch_json_tier3(
+                json_url.split("?")[0].replace(".json", ""),
+                comment_limit=comment_limit,
+                comment_sort=comment_sort,
+            )
     if not raw or not isinstance(raw, list) or len(raw) < 2:
+        if not config.reddit_html_enabled:
+            raise Blocked("Reddit HTML route is disabled")
         html_url = _html_url_from_json_url(json_url)
         html_result = _html_thread.fetch_thread(html_url)
         if html_result and html_result.get("post"):

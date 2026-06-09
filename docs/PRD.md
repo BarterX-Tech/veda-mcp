@@ -27,14 +27,18 @@ veda is **step 1 of modularising a larger system** into independent services. **
 ### 2a. One way to read a platform
 Reddit has two front doors: the **`.json` route** (clean, but Cloudflare-blocks our traffic) and the **HTML page** (a stealth browser still loads it; veda parses it).
 
-> **Try the structured route first. If it fails, scrape the HTML page — and return the same shape of data either way.**
+> **Use the route that is currently reliable, and return the same canonical shape.**
+
+As of 2026-06-10, live probes show Reddit `.json` returning blocked HTML from this environment, so
+veda disables Reddit `.json` by default and uses old.reddit HTML. The `.json` implementation stays
+behind a central config flag for future probes.
 
 ```text
    any MCP client
         │  calls a tool: fetch_thread / fetch_user / fetch_profile / fetch_rules / fetch_url
         ▼
    ┌──────────────────────────────────────┐
-   │  veda  (MCP server, HTTP/SSE)         │   try structured route ─► blocked ─► scrape HTML
+   │  veda  (MCP server, HTTP/SSE)         │   configured route ─► scrape HTML
    │   core: transport + parsers           │                                         │
    │   + one rate-limiter + cache          │   ◄────────── same canonical shape ◄────┘
    └──────────────────────────────────────┘
@@ -72,7 +76,8 @@ A clean, well-tested read service is reusable by any client and across platforms
 
 Root cause: the HTML parser returns **fewer fields** than the structured parser (parity gap), and a couple of reads never got the HTML fallback. veda fixes both as it absorbs the code — its parsers become field-complete and every read goes through the same structured→HTML→canonical path.
 
-*(Separately: the `.json` tiers are mostly dead weight today — veda keeps the JSON-first→HTML flow **as-is for now** and revisits dropping `.json` only after health monitoring shows the real `.json` success rate.)*
+*(Separately: the `.json` tiers are currently disabled by config, not deleted. Re-enable only for
+explicit probes or if live health data shows the route has become useful again.)*
 
 ---
 
@@ -83,6 +88,7 @@ Root cause: the HTML parser returns **fewer fields** than the structured parser 
 - ✅ **Strict isolation** — zero knowledge of any caller; depends on nothing external (boundary test enforces it).
 - ✅ One server, **one rate-limiter** + cache against the platform; robust parsing (deleted bodies, missing nodes, deep trees, pagination).
 - ✅ **Health monitoring** — per-tool/route success rates, `.json`-vs-HTML ratio, latency.
+- ✅ **Central scrape-route config** — Reddit JSON/HTML and external fetch tiers can be enabled or disabled without code changes.
 - ✅ **Local security posture** — loopback-only service, bearer-token-gated MCP traffic, private-network URL blocking, and conservative tool throttling.
 - ✅ Ops: **always-updated README** + a **`/veda-server` start/stop/status command**.
 - ✅ Service-ready: deploying to a real host later is just pointing the MCP config at a URL.
@@ -107,6 +113,7 @@ Granular checkboxes in [`TECHNICAL_PRD.md` §9](./TECHNICAL_PRD.md):
 - [ ] **M3 — `fetch_user` + `fetch_profile` tools.**
 - [ ] **M4 — `fetch_url` (external) tool.**
 - [ ] **M5 — Health monitoring.** Success rates, route ratio, latency; status surface.
+- [ ] **M5.5 — Central scrape-route config.** Disable Reddit `.json` by default, keep route toggles for future probes.
 - [ ] **M6 — Local security hardening.** Loopback-only operation, local bearer token, private-network URL blocking, rate limits, and token-aware service scripts.
 - [ ] *(Later)* `.json`-drop decision (using M5 data); deploy the server to a real host.
 
@@ -119,7 +126,7 @@ Each milestone ships test-first, one reviewable PR, with your sign-off before th
 - **Standalone repo** (`~/Documents/Services/Veda`) · **MCP server over HTTP/SSE** · one server, one rate-limiter.
 - **Strict isolation** — veda knows nothing about callers; depends on nothing external.
 - **Scope = pure platform reads;** Reddit-concrete now, generalise later.
-- **`.json` policy:** keep JSON-first→HTML **as-is**; revisit dropping `.json` after health monitoring (M5).
+- **`.json` policy:** Reddit `.json` is disabled by default (`VEDA_REDDIT_JSON_ENABLED=0`) because current live probes return blocked HTML. Keep the implementation behind config for future probes.
 - **Local auth policy:** `run/veda-token` is a long-lived local bearer token. It does not expire automatically; it remains valid until deleted/replaced and the server is restarted. This is acceptable for local-only Hermes usage; remote deployment needs stronger production auth with explicit rotation/expiry.
 - Ops: always-updated README + `/veda-server` command.
 

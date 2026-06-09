@@ -23,6 +23,12 @@ Defaults:
 
 - `VEDA_HOST=127.0.0.1`
 - `VEDA_PORT=8765`
+- `VEDA_REDDIT_JSON_ENABLED=0`
+- `VEDA_REDDIT_HTML_ENABLED=1`
+- `VEDA_EXTERNAL_GITHUB_RAW_ENABLED=1`
+- `VEDA_EXTERNAL_TIER1_ENABLED=1`
+- `VEDA_EXTERNAL_TIER2_ENABLED=1`
+- `VEDA_EXTERNAL_TIER3_ENABLED=1`
 - Streamable HTTP endpoint: `http://127.0.0.1:8765/mcp`
 - Local bearer token file: `run/veda-token`
 
@@ -45,12 +51,12 @@ Authorization: Bearer <contents of run/veda-token>
 - `fetch_url(url, max_chars=20000)`
 - `health_status()`
 
-The Reddit thread ladder is JSON-first, then HTML fallback. M0 preserves the
-ported fetch ladder while M1+ make the HTML branch field-complete. Subreddit
-rules also fall back to old.reddit HTML when JSON is blocked or empty, and
-mobile `/s/` share links resolve through the stealth fetch path before
-normalization. Shared transport owns the request fingerprint, rate limiter, and
-bounded in-memory cache.
+Scraping paths are controlled centrally by environment flags. Reddit `.json`
+routes are disabled by default because live probes currently return blocked HTML
+instead of JSON; Reddit reads go directly to old.reddit HTML unless
+`VEDA_REDDIT_JSON_ENABLED=1` is set. Mobile `/s/` share links resolve through
+the stealth fetch path before normalization. Shared transport owns the request
+fingerprint, rate limiter, and bounded in-memory cache.
 
 `fetch_user` falls back per requested listing kind, so a working submitted JSON
 listing can be combined with an HTML comments fallback. `fetch_profile` returns
@@ -66,9 +72,9 @@ core. The shared transport still owns platform-facing pacing and the bounded
 in-memory cache.
 
 Health monitoring records per-tool calls, successes, errors, route counts,
-`.json` vs HTML ratio, error codes, and average latency. Use the
-`health_status()` MCP tool or `scripts/veda-server status` against a running
-server.
+`.json` vs HTML ratio, error codes, average latency, and the active scraping
+config. Use the `health_status()` MCP tool or `scripts/veda-server status`
+against a running server.
 
 ## MCP Client
 

@@ -53,6 +53,10 @@ scripts/veda-server stop
 Production or remote deployments should keep the same MCP shape and swap only the endpoint URL,
 host, auth, and service-management layer.
 
+Active scrape routes are service configuration, not client contract. Local defaults currently keep
+Reddit `.json` disabled (`VEDA_REDDIT_JSON_ENABLED=0`) and Reddit HTML enabled
+(`VEDA_REDDIT_HTML_ENABLED=1`) because live `.json` probes return blocked HTML.
+
 ### 2.2 Tools
 
 Clients call six MCP tools:
@@ -143,8 +147,8 @@ Client notes:
 - Prefer `comment_sort="top"` when the downstream task needs high-signal comments.
 - Use `comments_collapsed` to decide whether the result is enough or whether a deeper read strategy
   is needed later.
-- The `route` field is operational; shape must be treated the same whether `route` is `json` or
-  `html`.
+- The `route` field is operational. Clients should currently expect Reddit routes to be `html`
+  unless service operators explicitly re-enable Reddit `.json`.
 
 ### 4.2 `fetch_user`
 
@@ -230,8 +234,8 @@ Client use cases:
 Client notes:
 
 - The subreddit may be passed as `macapps` or `r/macapps`.
-- veda tries structured rules first and falls back to old.reddit HTML when structured routes are
-  blocked or empty.
+- veda uses the configured Reddit routes. Local defaults skip structured rules JSON and use
+  old.reddit HTML.
 
 ### 4.5 `fetch_url`
 
@@ -280,6 +284,7 @@ Output shape:
   },
   routes: {...},
   json_vs_html: {json, html, html_ratio},
+  scraping_config: {...},
   totals: {calls, successes, errors}
 }
 ```

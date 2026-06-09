@@ -4,6 +4,8 @@ import lxml.html
 import requests
 
 from veda._transport import HEADERS, fetch_html
+from veda.config import get_scraping_config
+from veda.errors import Blocked
 from veda.reddit.types import Rule
 
 
@@ -57,12 +59,16 @@ def fetch_rules(
     json_fetcher=_fetch_rules_json,
     html_fetcher=fetch_html,
 ) -> list[Rule]:
+    config = get_scraping_config()
     sub = _clean_subreddit(subreddit)
-    try:
-        rules = json_fetcher(sub)
-        if rules:
-            return rules
-    except Exception:
-        pass
+    if config.reddit_json_enabled:
+        try:
+            rules = json_fetcher(sub)
+            if rules:
+                return rules
+        except Exception:
+            pass
+    if not config.reddit_html_enabled:
+        raise Blocked("Reddit HTML route is disabled")
     html = html_fetcher(f"https://old.reddit.com/r/{sub}/about/rules/")
     return _parse_rules_html(html or "")

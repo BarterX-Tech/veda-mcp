@@ -4,6 +4,8 @@ import time
 from typing import Any
 
 from veda._transport import fetch_json
+from veda.config import get_scraping_config
+from veda.errors import Blocked
 from veda.reddit import _html_user
 from veda.reddit.types import UserResult
 
@@ -81,24 +83,30 @@ def fetch_user(
     json_fetcher=None,
     html_history_fetcher=None,
 ) -> UserResult:
+    config = get_scraping_config()
     if json_fetcher is None:
         json_fetcher = fetch_json
     if html_history_fetcher is None:
         html_history_fetcher = _html_user.fetch_user_history
     wants_posts = "submitted" in kinds
     wants_comments = "comments" in kinds
-    posts = (
-        _paginate(username, "submitted", pages, 1.5, json_fetcher=json_fetcher)
-        if wants_posts
-        else []
-    )
-    comments = (
-        _paginate(username, "comments", pages, 1.5, json_fetcher=json_fetcher)
-        if wants_comments
-        else []
-    )
+    posts = []
+    comments = []
+    if config.reddit_json_enabled:
+        posts = (
+            _paginate(username, "submitted", pages, 1.5, json_fetcher=json_fetcher)
+            if wants_posts
+            else []
+        )
+        comments = (
+            _paginate(username, "comments", pages, 1.5, json_fetcher=json_fetcher)
+            if wants_comments
+            else []
+        )
     result = _parse_history(posts, comments)
     if (wants_posts and not result["posts"]) or (wants_comments and not result["comments"]):
+        if not config.reddit_html_enabled:
+            raise Blocked("Reddit HTML route is disabled")
         html_result = html_history_fetcher(username, pages=pages)
         return {
             "posts": result["posts"] or (html_result["posts"] if wants_posts else []),

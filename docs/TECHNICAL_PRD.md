@@ -21,7 +21,8 @@
 - `veda.external` — generic non-Reddit web pages (robots-aware).
 - *(future)* `veda.x`, etc.
 
-Each tries the source's structured route, falls back to scraping HTML, returns a **canonical shape**.
+Each uses centrally configured scrape routes and returns a **canonical shape**. Reddit `.json`
+routes are disabled by default for now; HTML is the active Reddit route.
 
 ### 1.2 The contract — core functions ↔ MCP tools
 The **core** is five functions; the **MCP shell** exposes each as a tool of the same name. Tool args = function kwargs; tool result = the JSON shape (§3). Errors are typed and carry a `.code`.
@@ -55,6 +56,7 @@ Veda/
     tech.barterx.veda.plist# launchd unit for the local always-on server
   veda/
     __init__.py
+    config.py             # central scrape-route flags (Reddit JSON/HTML, external tiers)
     _transport.py         # fingerprint/headers, StealthyFetcher wrappers, rate-limiter, .json/HTML tier ladder
     errors.py             # VedaError hierarchy
     reddit/
@@ -96,10 +98,22 @@ Local veda is intended to run 24/7 for local agents, but only as a loopback serv
 
 ### 1.6 The fetch ladder (inside `_transport`)
 ```text
-.json tier1 (requests, old.reddit/.json)     ┐ .json routes are Cloudflare-gated →
-  → tier2 (StealthyFetcher on .json)          │ fail in practice (kept as-is for now; see §8)
-  → tier3 (dynamic/Chromium on .json)         ┘
-  → HTML fallback (StealthyFetcher → HTML page) → parse → canonical shape   ← the working route
+central config
+  ├─ Reddit `.json` route (default off)
+  │    → tier1 requests → tier2 StealthyFetcher → tier3 dynamic/Chromium
+  └─ Reddit HTML route (default on)
+       → old.reddit HTML page → parse → canonical shape
+```
+
+Runtime flags:
+
+```text
+VEDA_REDDIT_JSON_ENABLED=0
+VEDA_REDDIT_HTML_ENABLED=1
+VEDA_EXTERNAL_GITHUB_RAW_ENABLED=1
+VEDA_EXTERNAL_TIER1_ENABLED=1
+VEDA_EXTERNAL_TIER2_ENABLED=1
+VEDA_EXTERNAL_TIER3_ENABLED=1
 ```
 
 ---
@@ -176,7 +190,10 @@ Severity: 🔴 wrong data · 🟠 silent empty/fail · 🟢 cosmetic.
 ---
 
 ## 6. The `.json` tier policy
-Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a latency cost). **Decision (2026-06-09):** keep the flow **as-is for now**; collect real success-rate data via health monitoring (M5), then decide whether to drop the `.json` tiers. No reshape until then.
+Reddit gates `.json`, so `.json` requests currently return blocked HTML instead of JSON from this
+environment. **Decision (2026-06-10):** disable Reddit `.json` by default via
+`VEDA_REDDIT_JSON_ENABLED=0` and go straight to old.reddit HTML. Keep the `.json` implementation
+behind the config flag so it can be re-enabled for future probes without code changes.
 
 ---
 
@@ -188,6 +205,7 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - **Contract test:** every tool result is JSON-serializable (it crosses the wire).
 - **Health test:** metrics increment correctly per route/outcome.
 - **Security tests:** bearer-token middleware blocks unauthenticated MCP traffic; `fetch_url` rejects localhost/private DNS targets; tool dispatcher reports `rate_limited`.
+- **Config tests:** default Reddit `.json` is disabled; explicit env flags can re-enable JSON or disable HTML/external tiers.
 
 ---
 
@@ -240,6 +258,12 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - [ ] Status surface (tool/endpoint + `/veda-server status`); README health section
 - [ ] PR: M5 — *informs the later `.json`-drop decision*
 
+### M5.5 — Central scrape-route config
+- [ ] Add central config for Reddit JSON/HTML and external route toggles
+- [ ] Disable Reddit `.json` by default
+- [ ] Expose active config in `health_status`
+- [ ] Tests + README/PRD updates
+
 ### M6 — Local security hardening
 - [ ] Keep local service bound to `127.0.0.1`
 - [ ] Add optional bearer-token auth for MCP traffic
@@ -251,5 +275,5 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - [ ] Tests + README/PRD updates
 
 ### Later (separate effort)
-- [ ] `.json`-drop decision using M5 data
+- [ ] `.json` re-enable/drop decision using health data and live probes
 - [ ] Deploy the MCP server to a real host (flip `localhost` → host + production auth)
