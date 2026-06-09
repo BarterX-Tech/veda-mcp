@@ -29,6 +29,7 @@ def _parse_rules_html(html: str) -> list[Rule]:
         return []
     doc = lxml.html.fromstring(html)
     rules: list[Rule] = []
+    seen: set[tuple[str, str]] = set()
     for node in doc.xpath(
         "//*[contains(concat(' ', normalize-space(@class), ' '), ' rule-item ')"
         " or contains(concat(' ', normalize-space(@class), ' '), ' rule ')]"
@@ -43,15 +44,25 @@ def _parse_rules_html(html: str) -> list[Rule]:
         )
         short_name = " ".join(title_nodes[0].text_content().split()) if title_nodes else ""
         description = " ".join(desc_nodes[0].text_content().split()) if desc_nodes else ""
-        if short_name or description:
+        key = (short_name, description)
+        if (short_name or description) and key not in seen:
+            seen.add(key)
             rules.append({"short_name": short_name, "description": description})
     return rules
 
 
-def fetch_rules(subreddit: str) -> list[Rule]:
+def fetch_rules(
+    subreddit: str,
+    *,
+    json_fetcher=_fetch_rules_json,
+    html_fetcher=fetch_html,
+) -> list[Rule]:
     sub = _clean_subreddit(subreddit)
     try:
-        return _fetch_rules_json(sub)
+        rules = json_fetcher(sub)
+        if rules:
+            return rules
     except Exception:
-        html = fetch_html(f"https://old.reddit.com/r/{sub}/about/rules/")
-        return _parse_rules_html(html or "")
+        pass
+    html = html_fetcher(f"https://old.reddit.com/r/{sub}/about/rules/")
+    return _parse_rules_html(html or "")

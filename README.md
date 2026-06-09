@@ -36,8 +36,10 @@ Launchd plist: `scripts/com.barterx.veda.plist`.
 - `fetch_url(url, max_chars=20000)`
 
 The Reddit thread ladder is JSON-first, then HTML fallback. M0 preserves the
-ported HTML thread parser behavior; the parity harness is marked `xfail` until
-M1 makes the HTML branch field-complete.
+ported fetch ladder while M1+ make the HTML branch field-complete. Subreddit
+rules also fall back to old.reddit HTML when JSON is blocked or empty, and
+mobile `/s/` share links resolve through the stealth fetch path before
+normalization.
 
 ## MCP Client
 

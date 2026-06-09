@@ -4,13 +4,13 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-import requests
-
 from veda._transport import (
-    HEADERS,
+    STEALTH_HTML,
     fetch_json_tier1,
     fetch_json_tier2,
     fetch_json_tier3,
+    page_body,
+    safe_fetch,
 )
 from veda.errors import Blocked, ParseError
 from veda.reddit import _html_thread
@@ -18,12 +18,12 @@ from veda.reddit.rules import fetch_rules
 from veda.reddit.types import Comment, Post, ThreadResult
 
 
-def normalize_to_json_url(raw_url: str) -> str:
+def normalize_to_json_url(raw_url: str, *, resolver=None) -> str:
     url = raw_url.strip().split("?")[0]
     if not url.startswith("http"):
         url = "https://" + url
     if "/s/" in url:
-        url = _resolve_share_link(url)
+        url = (resolver or _resolve_share_link)(url)
     if "/s/" not in url:
         url = re.sub(r"(?:www|old|m|amp|new)\.reddit\.com", "old.reddit.com", url)
         url = re.sub(r"^(https?://)reddit\.com", r"\1old.reddit.com", url)
@@ -36,13 +36,27 @@ def normalize_to_json_url(raw_url: str) -> str:
     return url
 
 
-def _resolve_share_link(url: str) -> str:
+def _page_url(page) -> str:
+    for attr in ("url", "final_url", "current_url"):
+        value = getattr(page, attr, None)
+        if value:
+            return str(value).split("?")[0]
+    body = page_body(page)
+    match = re.search(r'https?://(?:www|old)\.reddit\.com/r/[^"\']+/comments/[^"\']+', body)
+    return match.group(0).split("?")[0] if match else ""
+
+
+def _resolve_share_link(url: str, *, fetcher=None) -> str:
     resolve_url = re.sub(r"(?:old|m|amp|new)\.reddit\.com", "www.reddit.com", url)
     if "www.reddit.com" not in resolve_url:
         resolve_url = resolve_url.replace("reddit.com", "www.reddit.com")
     try:
-        response = requests.get(resolve_url, headers=HEADERS, allow_redirects=True, timeout=15)
-        final = response.url.split("?")[0]
+        if fetcher is None:
+            from scrapling.fetchers import StealthyFetcher
+
+            fetcher = StealthyFetcher
+        page = safe_fetch(fetcher, resolve_url, **STEALTH_HTML)
+        final = _page_url(page)
         if "/comments/" in final:
             return final
     except Exception:
