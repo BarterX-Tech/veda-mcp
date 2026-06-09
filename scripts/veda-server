@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
+HOST="${VEDA_HOST:-127.0.0.1}"
+PORT="${VEDA_PORT:-8765}"
+PID_DIR="$ROOT/run"
+LOG_DIR="$ROOT/logs"
+PID_FILE="$PID_DIR/veda-server.pid"
+LOG_FILE="$LOG_DIR/veda-server.log"
+
+usage() {
+  echo "usage: scripts/veda-server {start|stop|status}"
+}
+
+is_running() {
+  [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
+
+case "${1:-}" in
+  start)
+    mkdir -p "$PID_DIR" "$LOG_DIR"
+    if is_running; then
+      echo "veda server already running on http://$HOST:$PORT (pid $(cat "$PID_FILE"))"
+      exit 0
+    fi
+    if [[ ! -x "$PYTHON" ]]; then
+      echo "missing venv python at $PYTHON; run: uv venv --python /Users/nitinkhanna/.local/bin/python3.11 && uv pip install -e '.[dev]'"
+      exit 1
+    fi
+    VEDA_HOST="$HOST" VEDA_PORT="$PORT" nohup "$PYTHON" -m veda.mcp.server >"$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "veda server started on http://$HOST:$PORT (pid $(cat "$PID_FILE"))"
+    ;;
+  stop)
+    if is_running; then
+      kill "$(cat "$PID_FILE")"
+      rm -f "$PID_FILE"
+      echo "veda server stopped"
+    else
+      rm -f "$PID_FILE"
+      echo "veda server is not running"
+    fi
+    ;;
+  status)
+    if is_running; then
+      echo "running http://$HOST:$PORT pid=$(cat "$PID_FILE")"
+    else
+      echo "stopped"
+    fi
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac

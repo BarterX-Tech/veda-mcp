@@ -1,0 +1,17 @@
+from __future__ import annotations
+
+from veda._transport import fetch_html
+from veda.reddit._html_profile import extract_profile
+from veda.reddit.types import ProfileResult
+
+_PROFILE_URL = "https://old.reddit.com/user/{u}/"
+
+
+def fetch_profile(username: str) -> ProfileResult:
+    html = fetch_html(_PROFILE_URL.format(u=username))
+    parsed = extract_profile(html or "")
+    return {
+        "username": username,
+        "bio": parsed["about_text"],
+        "links": parsed["external_urls"],
+    }
