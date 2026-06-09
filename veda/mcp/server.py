@@ -1,10 +1,99 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from veda.mcp import tools
+
+Receive = Callable[[], Awaitable[dict[str, Any]]]
+Send = Callable[[dict[str, Any]], Awaitable[None]]
+AsgiApp = Callable[[dict[str, Any], Receive, Send], Awaitable[None]]
+
+
+HOME_HTML = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>veda MCP server</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { margin: 0; padding: 48px 24px; background: Canvas; color: CanvasText; }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 32px; margin: 0 0 8px; }
+    p { line-height: 1.55; }
+    code {
+      background: color-mix(in srgb, CanvasText 10%, Canvas);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    ul { padding-left: 22px; }
+    .panel {
+      border: 1px solid color-mix(in srgb, CanvasText 22%, Canvas);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>veda MCP server</h1>
+    <p>veda is running. This browser page is only a friendly status surface for humans.</p>
+    <div class="panel">
+      <p><strong>MCP endpoint:</strong> <code>/mcp</code></p>
+      <p>Connect with an MCP Streamable HTTP client and call the tools below.</p>
+      <ul>
+        <li><code>fetch_thread</code></li>
+        <li><code>fetch_user</code></li>
+        <li><code>fetch_profile</code></li>
+        <li><code>fetch_rules</code></li>
+        <li><code>fetch_url</code></li>
+        <li><code>health_status</code></li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>
+"""
+
+
+class BrowserHomePage:
+    def __init__(self, app: AsgiApp, *, path: str, html: str = HOME_HTML) -> None:
+        self.app = app
+        self.path = path
+        self.body = html.encode()
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if self._is_browser_home_request(scope):
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        (b"content-type", b"text/html; charset=utf-8"),
+                        (b"content-length", str(len(self.body)).encode()),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": self.body})
+            return
+        await self.app(scope, receive, send)
+
+    def _is_browser_home_request(self, scope: dict[str, Any]) -> bool:
+        if scope.get("type") != "http":
+            return False
+        if scope.get("method") != "GET" or scope.get("path") != self.path:
+            return False
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        accept = headers.get(b"accept", b"").decode(errors="ignore")
+        return "text/html" in accept and "text/event-stream" not in accept
 
 
 def create_server() -> FastMCP:
@@ -52,7 +141,17 @@ def create_server() -> FastMCP:
     async def health_status() -> dict:
         return await tools.call_tool("health_status", {})
 
+    _install_browser_home_page(server)
     return server
+
+
+def _install_browser_home_page(server: FastMCP) -> None:
+    original = server.streamable_http_app
+
+    def streamable_http_app():
+        return BrowserHomePage(original(), path=server.settings.streamable_http_path)
+
+    server.streamable_http_app = streamable_http_app
 
 
 def main() -> None:
