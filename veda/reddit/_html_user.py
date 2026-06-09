@@ -25,6 +25,10 @@ def _score(thing) -> int:
         title = node.get("title")
         if title and title.strip().lstrip("-").isdigit():
             return int(title)
+        text = node.text_content().replace(",", "")
+        for token in text.split():
+            if token.lstrip("-").isdigit():
+                return int(token)
     return 0
 
 

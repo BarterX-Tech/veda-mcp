@@ -44,14 +44,23 @@ def _parse_history(post_children: list[dict], comment_children: list[dict]) -> U
     return {"posts": posts, "comments": comments}
 
 
-def _paginate(username: str, kind: str, pages: int, delay: float) -> list[dict[str, Any]]:
+def _paginate(
+    username: str,
+    kind: str,
+    pages: int,
+    delay: float,
+    *,
+    json_fetcher=None,
+) -> list[dict[str, Any]]:
+    if json_fetcher is None:
+        json_fetcher = fetch_json
     children: list[dict[str, Any]] = []
     after = None
     for index in range(pages):
         url = _USER_URL.format(u=username, kind=kind)
         if after:
             url += f"&after={after}"
-        listing = fetch_json(url)
+        listing = json_fetcher(url)
         if not listing:
             break
         data = listing.get("data", {}) if isinstance(listing, dict) else {}
@@ -69,14 +78,30 @@ def fetch_user(
     *,
     kinds: tuple[str, ...] = ("submitted", "comments"),
     pages: int = 2,
+    json_fetcher=None,
+    html_history_fetcher=None,
 ) -> UserResult:
-    posts = _paginate(username, "submitted", pages, 1.5) if "submitted" in kinds else []
-    comments = _paginate(username, "comments", pages, 1.5) if "comments" in kinds else []
+    if json_fetcher is None:
+        json_fetcher = fetch_json
+    if html_history_fetcher is None:
+        html_history_fetcher = _html_user.fetch_user_history
+    wants_posts = "submitted" in kinds
+    wants_comments = "comments" in kinds
+    posts = (
+        _paginate(username, "submitted", pages, 1.5, json_fetcher=json_fetcher)
+        if wants_posts
+        else []
+    )
+    comments = (
+        _paginate(username, "comments", pages, 1.5, json_fetcher=json_fetcher)
+        if wants_comments
+        else []
+    )
     result = _parse_history(posts, comments)
-    if not result["posts"] and not result["comments"]:
-        html_result = _html_user.fetch_user_history(username, pages=pages)
+    if (wants_posts and not result["posts"]) or (wants_comments and not result["comments"]):
+        html_result = html_history_fetcher(username, pages=pages)
         return {
-            "posts": html_result["posts"] if "submitted" in kinds else [],
-            "comments": html_result["comments"] if "comments" in kinds else [],
+            "posts": result["posts"] or (html_result["posts"] if wants_posts else []),
+            "comments": result["comments"] or (html_result["comments"] if wants_comments else []),
         }
     return result

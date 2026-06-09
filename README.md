@@ -41,6 +41,10 @@ rules also fall back to old.reddit HTML when JSON is blocked or empty, and
 mobile `/s/` share links resolve through the stealth fetch path before
 normalization.
 
+`fetch_user` falls back per requested listing kind, so a working submitted JSON
+listing can be combined with an HTML comments fallback. `fetch_profile` returns
+the old.reddit bio text plus deduped non-Reddit external URLs.
+
 ## MCP Client
 
 Point an MCP Streamable HTTP client at:
