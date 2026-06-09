@@ -45,6 +45,10 @@ normalization.
 listing can be combined with an HTML comments fallback. `fetch_profile` returns
 the old.reddit bio text plus deduped non-Reddit external URLs.
 
+`fetch_url` honors robots.txt, chooses a static-first route for known lightweight
+hosts, escalates through stealth/dynamic HTML tiers when extracted text is thin,
+and caps returned text to `max_chars`.
+
 ## MCP Client
 
 Point an MCP Streamable HTTP client at:

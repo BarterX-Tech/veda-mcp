@@ -5,7 +5,8 @@ from urllib.robotparser import RobotFileParser
 
 import lxml.html
 
-from veda._transport import _html_tier1, _html_tier2, _html_tier3, fetch_html
+from veda._transport import _html_tier1, _html_tier2, _html_tier3
+from veda._transport import fetch_html as transport_fetch_html
 from veda.errors import Blocked
 from veda.reddit.types import ExternalDoc
 
@@ -92,8 +93,19 @@ def _default_fetch_html(url: str, tier: str) -> str | None:
     return {"tier1": _html_tier1, "tier2": _html_tier2, "tier3": _html_tier3}[tier](url)
 
 
-def fetch_url(url: str, *, max_chars: int = DEFAULT_MAX_CHARS) -> ExternalDoc:
-    if not robots_allowed(url, fetch_robots=fetch_html):
+def fetch_url(
+    url: str,
+    *,
+    max_chars: int = DEFAULT_MAX_CHARS,
+    fetch_html=None,
+    robots_check=None,
+) -> ExternalDoc:
+    if fetch_html is None:
+        fetch_html = _default_fetch_html
+    if robots_check is None:
+        def robots_check(target: str) -> bool:
+            return robots_allowed(target, fetch_robots=transport_fetch_html)
+    if not robots_check(url):
         raise Blocked(f"robots.txt disallows {url}")
 
     start = route_start_tier(url)
@@ -102,7 +114,7 @@ def fetch_url(url: str, *, max_chars: int = DEFAULT_MAX_CHARS) -> ExternalDoc:
     best_tier = sequence[0]
     for tier in sequence:
         try:
-            html = _default_fetch_html(url, tier)
+            html = fetch_html(url, tier)
         except Exception:
             html = None
         text = extract_readable_text(html or "", max_chars=max_chars)
