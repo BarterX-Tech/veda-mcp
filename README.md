@@ -78,3 +78,9 @@ ruff check .
 The boundary test AST-scans `veda/**/*.py` and fails on imports outside the
 allowed dependency set or any `reddit_operator` reference. Read paths return data
 only; they do not save files.
+
+## Docs
+
+- [Product PRD](docs/PRD.md)
+- [Technical PRD](docs/TECHNICAL_PRD.md)
+- [Integration PRD](docs/INTEGRATION_PRD.md)

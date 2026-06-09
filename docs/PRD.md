@@ -3,6 +3,9 @@
 **Status:** DRAFT · **Date:** 2026-06-09 · **Owner:** Nitin
 **Deep dive:** [`TECHNICAL_PRD.md`](./TECHNICAL_PRD.md) — repo layout, tool contract, parser specs, tasks.
 
+**Client integration:** [`INTEGRATION_PRD.md`](./INTEGRATION_PRD.md) — how clients connect to
+veda and use the tools safely.
+
 The zoom-out picture of **veda**: what it is, the one job it does, and what "done" looks like. veda is a self-contained service; it knows nothing about who calls it or what they do with the data.
 
 ---
