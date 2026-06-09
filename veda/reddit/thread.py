@@ -184,8 +184,11 @@ def _shape_html_result(
     json_url: str,
     source_url: str,
     comment_sort: str,
+    rules_fetcher=None,
 ) -> ThreadResult:
     post_in = html_result["post"]
+    if rules_fetcher is None:
+        rules_fetcher = fetch_rules
     html_comments = _normalize_html_comments(html_result.get("comments", []))
     stats = count_stats(html_comments)
     subreddit = post_in.get("subreddit", "")
@@ -210,7 +213,7 @@ def _shape_html_result(
     return {
         "post": post,
         "comments": html_comments,
-        "subreddit_rules": fetch_rules(subreddit) if subreddit else [],
+        "subreddit_rules": rules_fetcher(subreddit) if subreddit else [],
         "meta": {
             "scraped_at": datetime.now(UTC).isoformat(),
             "json_url": json_url,

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from veda.reddit import _html_thread
-from veda.reddit.thread import _normalize_html_comments, extract_comments, extract_post
+from veda.reddit.thread import (
+    _normalize_html_comments,
+    _shape_html_result,
+    extract_comments,
+    extract_post,
+)
 
 JSON_FIXTURE = [
     {
@@ -61,7 +64,6 @@ JSON_FIXTURE = [
 ]
 
 
-@pytest.mark.xfail(reason="M1 makes the HTML thread parser field-complete.")
 def test_json_and_html_thread_comment_field_parity() -> None:
     html = (Path(__file__).parent / "fixtures" / "thread.html").read_text()
 
@@ -70,5 +72,20 @@ def test_json_and_html_thread_comment_field_parity() -> None:
     html_result = _html_thread.parse_thread_html(html)
     html_comment = _normalize_html_comments(html_result["comments"])[0]
 
-    assert set(html_result["post"]) == set(json_post)
+    shaped = _shape_html_result(
+        html_result,
+        html_url="https://old.reddit.com/r/macapps/comments/abc123/post/",
+        json_url="https://old.reddit.com/r/macapps/comments/abc123/post/.json",
+        source_url="https://www.reddit.com/r/macapps/comments/abc123/post/",
+        comment_sort="top",
+        rules_fetcher=lambda subreddit: [],
+    )
+
+    assert set(shaped["post"]) == set(json_post)
     assert set(html_comment) == set(json_comment)
+    assert shaped["post"]["score"] == json_post["score"]
+    assert shaped["post"]["created_utc"] == json_post["created_utc"]
+    assert shaped["post"]["num_comments"] == json_post["num_comments"]
+    assert html_comment["score"] == json_comment["score"]
+    assert html_comment["created_utc"] == json_comment["created_utc"]
+    assert html_comment["id"] == json_comment["id"]

@@ -1,22 +1,51 @@
 <html><body>
-<div class="thing link" data-author="Downtown-Art2865" data-subreddit="macapps">
-  <a class="title" href="#">My Clipboard Post</a>
+<div class="thing link self" data-author="Downtown-Art2865" data-subreddit="macapps"
+     data-fullname="t3_abc123" data-timestamp="1710000000000"
+     data-permalink="/r/macapps/comments/abc123/post/">
+  <p class="title"><a class="title" href="https://example.com/post">My Clipboard Post</a></p>
+  <div class="score likes">43</div><div class="score unvoted" title="42">42</div>
+  <a class="comments">2 comments</a>
   <div class="entry"><div class="usertext-body"><div class="md"><p>post body here</p></div></div></div>
 </div>
 <div class="commentarea">
   <div class="sitetable nestedlisting">
-    <div class="thing comment" data-author="alice">
-      <div class="entry"><div class="usertext-body"><div class="md"><p>alice top comment</p></div></div></div>
+    <div class="thing comment" data-author="alice" data-fullname="t1_c1"
+         data-parent="t3_abc123" data-permalink="/r/macapps/comments/abc123/post/c1/"
+         data-timestamp="1710000100000">
+      <div class="entry">
+        <p class="tagline"><a class="author">alice</a></p>
+        <span class="score likes">8 points</span><span class="score unvoted" title="7">7 points</span>
+        <time datetime="2024-03-09T16:28:20+00:00">time</time>
+        <ul class="flat-list buttons"><li><a class="bylink comments may-blank">permalink</a></li></ul>
+        <div class="usertext-body"><div class="md"><p>alice top comment</p></div></div>
+      </div>
       <div class="child"><div class="sitetable listing">
-        <div class="thing comment" data-author="Downtown-Art2865">
-          <div class="entry"><div class="usertext-body"><div class="md"><p>my reply to alice</p></div></div></div>
+        <div class="thing comment" data-author="Downtown-Art2865" data-fullname="t1_c2"
+             data-parent="t1_c1" data-permalink="/r/macapps/comments/abc123/post/c2/"
+             data-timestamp="1710000200000">
+          <div class="entry">
+            <p class="tagline"><a class="author submitter">Downtown-Art2865</a></p>
+            <span class="score unvoted" title="3">3 points</span>
+            <time datetime="2024-03-09T16:30:00+00:00">time</time>
+            <span class="edited-timestamp">edited</span><span class="gilded-gid1">1</span>
+            <div class="usertext-body"><div class="md"><p>my reply to alice</p></div></div>
+          </div>
           <div class="child"></div>
         </div>
       </div></div>
     </div>
-    <div class="thing comment" data-author="bob">
-      <div class="entry"><div class="usertext-body"><div class="md"><p>bob top comment</p></div></div></div>
+    <div class="thing comment" data-author="bob" data-fullname="t1_c3"
+         data-parent="t3_abc123" data-permalink="/r/macapps/comments/abc123/post/c3/"
+         data-timestamp="1710000300000">
+      <div class="entry">
+        <p class="tagline"><a class="author">bob</a></p>
+        <span class="score dislikes">0 points</span><span class="score unvoted" title="1">1 point</span>
+        <div class="usertext-body"><div class="md"><p>bob top comment</p></div></div>
+      </div>
       <div class="child"></div>
+    </div>
+    <div class="thing morechildren" data-fullname="more_x">
+      <span class="morecomments"><a>load more comments</a></span>
     </div>
   </div>
 </div>
