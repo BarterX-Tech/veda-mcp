@@ -1,6 +1,6 @@
 # veda — Technical PRD
 
-**Status:** DRAFT · **Date:** 2026-06-09 · **Owner:** Nitin
+**Status:** DRAFT · **Date:** 2026-06-10 · **Owner:** Nitin
 **Companion:** [`PRD.md`](./PRD.md). This is the deep spec — repo layout, tool contract, parser specs, tests, tasks.
 
 > **Scope discipline:** this document describes **veda only**. veda is caller-agnostic — it never references a consumer, what the data is used for, or any other project. Its contract is *requested resource → clean data*.
@@ -86,6 +86,8 @@ Local veda is intended to run 24/7 for local agents, but only as a loopback serv
 - **Bind address:** default `VEDA_HOST=127.0.0.1`. Local launchd/service mode must not bind to `0.0.0.0`.
 - **Bearer auth:** if `VEDA_AUTH_TOKEN` is present, every MCP request must include `Authorization: Bearer <token>`. Browser-style `GET /mcp` remains a public local status page; actual MCP traffic is token-gated.
 - **Token storage:** `scripts/veda-server` generates a token in `run/veda-token` (`0600`, ignored by git) when no `VEDA_AUTH_TOKEN` is provided. The launchd unit receives `VEDA_TOKEN_FILE` and the Python server reads that token at startup.
+- **Token validity:** local tokens are long-lived and do not expire automatically. A token remains valid until `run/veda-token` is deleted/replaced or `VEDA_AUTH_TOKEN` changes and the server is restarted.
+- **Token rotation:** rotate local auth by stopping veda, deleting `run/veda-token`, starting veda, and updating MCP clients with the new token. If `VEDA_AUTH_TOKEN` is managed externally, rotate that secret and restart the service.
 - **Client config:** local MCP clients should read `run/veda-token` or be configured with the same `VEDA_AUTH_TOKEN`.
 - **SSRF guard:** `fetch_url` accepts only `http`/`https` URLs whose host resolves to public IPs. It blocks localhost, `.local`, private, loopback, link-local, multicast, reserved, and otherwise non-global addresses.
 - **Tool throttling:** the MCP dispatcher applies conservative per-tool sliding-window limits before calling the core. Transport-level pacing still controls platform-facing request cadence.
@@ -242,6 +244,7 @@ Reddit gates `.json`, so tiers 1–3 mostly fail before the HTML route wins (a l
 - [ ] Keep local service bound to `127.0.0.1`
 - [ ] Add optional bearer-token auth for MCP traffic
 - [ ] Generate/store local token outside git for launchd and script starts
+- [ ] Document local token validity and rotation procedure
 - [ ] Block private/internal targets in `fetch_url`
 - [ ] Add per-tool sliding-window limits at the MCP dispatcher
 - [ ] Update `scripts/veda-server stop/status` for launchd + token-aware health checks

@@ -1,6 +1,6 @@
 # veda — Integration PRD
 
-**Status:** DRAFT · **Date:** 2026-06-09 · **Owner:** Nitin
+**Status:** DRAFT · **Date:** 2026-06-10 · **Owner:** Nitin
 **Companions:** [`PRD.md`](./PRD.md), [`TECHNICAL_PRD.md`](./TECHNICAL_PRD.md)
 
 This document explains how any client should integrate with **veda**. It is intentionally
@@ -383,6 +383,11 @@ For local service mode, `scripts/veda-server start` generates `run/veda-token` w
 `VEDA_AUTH_TOKEN` is not already set. Clients running on the same machine should read that token
 or use the same environment variable. Browser-style `GET /mcp` is a human status page; MCP
 protocol calls should include the bearer header.
+
+The local token is long-lived. It does not expire automatically and remains valid until rotated.
+Rotate it by stopping veda, deleting `run/veda-token`, starting veda again, and updating every
+local MCP client with the new bearer value. Remote deployments should not inherit this local-token
+policy; they need production auth with managed secrets, HTTPS, rotation, and expiry.
 
 ### 7.3 Concurrency
 
