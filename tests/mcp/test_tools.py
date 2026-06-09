@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from veda import health
 from veda.errors import Blocked
 from veda.mcp import tools
 from veda.mcp.server import create_server
@@ -16,10 +17,12 @@ def test_tool_registry_has_five_tools() -> None:
         "fetch_profile",
         "fetch_rules",
         "fetch_url",
+        "health_status",
     }
 
 
 def test_call_tool_delegates_to_core(monkeypatch) -> None:
+    health.reset()
     monkeypatch.setattr(
         tools.reddit_thread,
         "fetch_thread",
@@ -39,9 +42,13 @@ def test_call_tool_delegates_to_core(monkeypatch) -> None:
     )
 
     assert result["post"]["title"] == "T"
+    snapshot = health.snapshot()
+    assert snapshot["tools"]["fetch_thread"]["successes"] == 1
+    assert snapshot["routes"]["html"] == 1
 
 
 def test_call_tool_maps_veda_error(monkeypatch) -> None:
+    health.reset()
     def fail(url, max_chars=20000):
         raise Blocked("nope")
 
@@ -51,6 +58,9 @@ def test_call_tool_maps_veda_error(monkeypatch) -> None:
         asyncio.run(tools.call_tool("fetch_url", {"url": "https://example.com"}))
 
     assert exc.value.code == "blocked"
+    snapshot = health.snapshot()
+    assert snapshot["tools"]["fetch_url"]["errors"] == 1
+    assert snapshot["tools"]["fetch_url"]["error_codes"]["blocked"] == 1
 
 
 def test_fastmcp_server_lists_and_calls_all_tools(monkeypatch) -> None:
@@ -97,6 +107,7 @@ def test_fastmcp_server_lists_and_calls_all_tools(monkeypatch) -> None:
             "fetch_profile": {"username": "alice"},
             "fetch_rules": {"subreddit": "macapps"},
             "fetch_url": {"url": "https://example.com"},
+            "health_status": {},
         }
         for name, arguments in calls.items():
             result = await server.call_tool(name, arguments)

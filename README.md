@@ -34,6 +34,7 @@ Launchd plist: `scripts/com.barterx.veda.plist`.
 - `fetch_profile(username)`
 - `fetch_rules(subreddit)`
 - `fetch_url(url, max_chars=20000)`
+- `health_status()`
 
 The Reddit thread ladder is JSON-first, then HTML fallback. M0 preserves the
 ported fetch ladder while M1+ make the HTML branch field-complete. Subreddit
@@ -48,6 +49,10 @@ the old.reddit bio text plus deduped non-Reddit external URLs.
 `fetch_url` honors robots.txt, chooses a static-first route for known lightweight
 hosts, escalates through stealth/dynamic HTML tiers when extracted text is thin,
 and caps returned text to `max_chars`.
+
+Health monitoring records per-tool calls, successes, errors, route counts,
+error codes, and average latency. Use the `health_status()` MCP tool or
+`scripts/veda-server status` against a running server.
 
 ## MCP Client
 

@@ -46,6 +46,21 @@ case "${1:-}" in
   status)
     if is_running; then
       echo "running http://$HOST:$PORT pid=$(cat "$PID_FILE")"
+      "$PYTHON" - <<PY 2>/dev/null || echo "health unavailable"
+import anyio
+import json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+async def main():
+    async with streamablehttp_client("http://$HOST:$PORT/mcp") as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("health_status", {})
+            print(result.content[0].text if result.content else json.dumps({}))
+
+anyio.run(main)
+PY
     else
       echo "stopped"
     fi

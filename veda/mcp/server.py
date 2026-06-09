@@ -48,6 +48,10 @@ def create_server() -> FastMCP:
     async def fetch_url(url: str, max_chars: int = 20000) -> dict:
         return await tools.call_tool("fetch_url", {"url": url, "max_chars": max_chars})
 
+    @server.tool()
+    async def health_status() -> dict:
+        return await tools.call_tool("health_status", {})
+
     return server
 
 

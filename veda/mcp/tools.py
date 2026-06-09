@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any
 
 from veda import external as external_fetch
+from veda import health
 from veda.errors import VedaError
 from veda.reddit import profile as reddit_profile
 from veda.reddit import rules as reddit_rules
@@ -56,19 +58,58 @@ async def _fetch_url(args: dict[str, Any]) -> Any:
     )
 
 
+async def _health_status(args: dict[str, Any]) -> Any:
+    return health.snapshot()
+
+
 TOOL_HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "fetch_thread": _fetch_thread,
     "fetch_user": _fetch_user,
     "fetch_profile": _fetch_profile,
     "fetch_rules": _fetch_rules,
     "fetch_url": _fetch_url,
+    "health_status": _health_status,
 }
+
+
+def _route_for_result(result: Any) -> str:
+    if isinstance(result, dict):
+        meta = result.get("meta")
+        if isinstance(meta, dict) and meta.get("route"):
+            return str(meta["route"])
+        if result.get("route"):
+            return str(result["route"])
+    return "core"
 
 
 async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> Any:
     if name not in TOOL_HANDLERS:
         raise ToolError(f"Unknown tool: {name}", code="unknown_tool")
+    started = time.monotonic()
     try:
-        return await TOOL_HANDLERS[name](arguments or {})
+        result = await TOOL_HANDLERS[name](arguments or {})
     except VedaError as exc:
+        health.record(
+            name,
+            route="error",
+            outcome="error",
+            latency_ms=(time.monotonic() - started) * 1000,
+            error_code=exc.code,
+        )
         raise ToolError(str(exc), code=exc.code) from exc
+    except Exception:
+        health.record(
+            name,
+            route="error",
+            outcome="error",
+            latency_ms=(time.monotonic() - started) * 1000,
+            error_code="exception",
+        )
+        raise
+    health.record(
+        name,
+        route=_route_for_result(result),
+        outcome="success",
+        latency_ms=(time.monotonic() - started) * 1000,
+    )
+    return result
