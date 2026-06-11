@@ -24,6 +24,8 @@ REDDIT_THREAD = (
     "https://old.reddit.com/r/announcements/comments/7jsyqt/"
     "the_fccs_vote_was_predictably_frustrating_but/"
 )
+# Reddit cofounder/CEO; account since 2005 — a maximally stable public profile.
+REDDIT_USER = "spez"
 MIN_EXTERNAL_CHARS = 200
 
 
@@ -52,6 +54,16 @@ def probe_subreddit_rules() -> None:
     assert rules[0].get("short_name"), "rule missing short_name"
 
 
+def probe_reddit_user() -> None:
+    from veda.reddit import fetch_user
+
+    result = fetch_user(REDDIT_USER, pages=1)
+    assert result["username"] == REDDIT_USER
+    assert result["post_karma"] is not None, "post_karma missing"
+    assert result["created_utc"], "account-created timestamp missing"
+    assert result["posts"] or result["comments"], "no public activity returned"
+
+
 def probe_reddit_thread() -> None:
     from veda.reddit import fetch_thread
 
@@ -67,7 +79,13 @@ def probe_reddit_thread() -> None:
 
 
 def main() -> int:
-    probes = (probe_tiers, probe_external, probe_subreddit_rules, probe_reddit_thread)
+    probes = (
+        probe_tiers,
+        probe_external,
+        probe_subreddit_rules,
+        probe_reddit_thread,
+        probe_reddit_user,
+    )
     failures = 0
     for probe in probes:
         name = probe.__name__

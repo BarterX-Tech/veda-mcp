@@ -132,7 +132,7 @@ file — no secrets or addresses are stored in the repo:
 ```bash
 cp run/veda-mail.env.example run/veda-mail.env   # then fill in real values
 scripts/veda-report send                          # send once now
-scripts/veda-report schedule                       # macOS: daily 09:00 launchd job
+scripts/veda-report schedule                       # macOS: daily 10:00 launchd job
 scripts/veda-report unschedule                     # remove it
 ```
 

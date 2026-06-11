@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Daily health report emailer.
 #   send        run once and email the report now
-#   schedule    install a daily 09:00 launchd job (macOS)
+#   schedule    install a daily 10:00 launchd job (macOS)
 #   unschedule  remove the scheduled job
 #
 # Requires run/veda-mail.env (gitignored) with RESEND_API_KEY,
@@ -20,7 +20,7 @@ case "${1:-send}" in
   schedule)
     if [[ "$(uname -s)" != "Darwin" ]]; then
       echo "schedule uses launchd (macOS); use cron on other systems:" >&2
-      echo "  0 9 * * * cd $ROOT && .venv/bin/python scripts/health_report.py >> ~/veda-report.log 2>&1" >&2
+      echo "  0 10 * * * cd $ROOT && .venv/bin/python scripts/health_report.py >> ~/veda-report.log 2>&1" >&2
       exit 1
     fi
     mkdir -p "$ROOT/run"
@@ -28,7 +28,7 @@ case "${1:-send}" in
       "$ROOT/scripts/report.launchd.plist.template" > "$PLIST"
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$PLIST"
-    echo "health report scheduled daily at 09:00 (label $LABEL, log $LOG)"
+    echo "health report scheduled daily at 10:00 (label $LABEL, log $LOG)"
     ;;
   unschedule)
     if launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null; then

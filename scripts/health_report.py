@@ -241,6 +241,23 @@ def _collect_samples() -> list[dict]:
     except Exception as exc:  # noqa: BLE001
         samples.append({"tool": "fetch_rules", "fields": {"error": str(exc)[:120]}, "shape": ""})
 
+    from veda.reddit import fetch_user
+
+    try:
+        user = fetch_user(canary.REDDIT_USER, pages=1)
+        samples.append({
+            "tool": f"fetch_user ({canary.REDDIT_USER})",
+            "fields": {
+                "post karma": user["post_karma"],
+                "comment karma": user["comment_karma"],
+                "bio": (user["bio"][:50] + "…") if user["bio"] else "—",
+                "posts / comments": f"{len(user['posts'])} / {len(user['comments'])}",
+            },
+            "shape": _describe(user),
+        })
+    except Exception as exc:  # noqa: BLE001
+        samples.append({"tool": "fetch_user", "fields": {"error": str(exc)[:120]}, "shape": ""})
+
     from veda.external.fetch import fetch_url
 
     try:
