@@ -20,6 +20,8 @@ import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from datetime import UTC
+
 from veda import health  # noqa: E402
 from veda._transport import tier_capabilities  # noqa: E402
 
@@ -114,10 +116,10 @@ def _send(subject: str, html: str, text: str) -> None:
 
 
 def main() -> int:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     _load_env_file()
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     rows = _run_probes()
     tiers = tier_capabilities(refresh=True)
     totals = health.snapshot().get("totals", {})
