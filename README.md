@@ -11,11 +11,24 @@ uv venv --python /Users/nitinkhanna/.local/bin/python3.11
 uv pip install -e ".[dev]"
 ```
 
+Dependencies include `scrapling[fetchers]` (stealth + dynamic browser tiers) and
+`trafilatura` (readable-text extraction). On a fresh machine, fetch the browser
+binaries once:
+
+```bash
+.venv/bin/scrapling install
+```
+
+`health_status()` reports `tiers_available`; the server also logs a warning at
+startup when a fetch tier is unavailable, so a broken browser dependency is loud
+instead of silently degrading every external fetch.
+
 ## Run
 
 ```bash
 scripts/veda-server start
 scripts/veda-server status
+scripts/veda-server restart
 scripts/veda-server stop
 ```
 
@@ -46,7 +59,6 @@ Authorization: Bearer <contents of run/veda-token>
 
 - `fetch_thread(url, comment_limit=500, comment_sort="top")`
 - `fetch_user(username, kinds=("submitted","comments"), pages=2)`
-- `fetch_profile(username)`
 - `fetch_rules(subreddit)`
 - `fetch_url(url, max_chars=20000)`
 - `health_status()`
@@ -59,22 +71,37 @@ the stealth fetch path before normalization. Shared transport owns the request
 fingerprint, rate limiter, and bounded in-memory cache.
 
 `fetch_user` falls back per requested listing kind, so a working submitted JSON
-listing can be combined with an HTML comments fallback. `fetch_profile` returns
-the old.reddit bio text plus deduped non-Reddit external URLs.
+listing can be combined with an HTML comments fallback. Its result also carries
+the profile sidebar — bio text, deduped non-Reddit external URLs, post/comment
+karma, and the account-created timestamp — extracted from the listing pages at
+no extra request cost (one extra profile-page read only on the JSON route).
+New-style bios/social links that old.reddit never renders are filled by one
+stealth fetch of the new-reddit profile page when the sidebar is empty.
 
-`fetch_url` honors robots.txt, blocks localhost/private-network targets, fetches
-GitHub repository READMEs through the raw markdown path, chooses a static-first
-route for known lightweight hosts, escalates through stealth/dynamic HTML tiers
-when extracted text is thin, and caps returned text to `max_chars`.
+`fetch_url` honors robots.txt (fetched with a cheap plain request, never the
+browser ladder), blocks localhost/private-network targets, and fetches GitHub
+repository READMEs through the raw markdown path (`HEAD` ref, repo-root URLs
+only, status-checked). Every host tries the cheap tier1 request first, then
+escalates through stealth (tier2) and dynamic-browser (tier3) HTML tiers when
+extracted text is thin. Text extraction uses trafilatura with markdown-style
+block separation, falling back to an xpath chain; results include `title` and a
+`truncated` flag, and text is capped to `max_chars`.
 
 The MCP dispatcher applies conservative per-tool rate limits before calling the
 core. The shared transport still owns platform-facing pacing and the bounded
 in-memory cache.
 
 Health monitoring records per-tool calls, successes, errors, route counts,
-`.json` vs HTML ratio, error codes, average latency, and the active scraping
-config. Use the `health_status()` MCP tool or `scripts/veda-server status`
-against a running server.
+`.json` vs HTML ratio, error codes, average latency, the active scraping
+config, and `tiers_available` (which fetch tiers can run in this environment).
+Use the `health_status()` MCP tool or `scripts/veda-server status` against a
+running server.
+
+`scripts/veda-canary` runs live probes (tier availability, two external URLs,
+subreddit rules, one archived Reddit thread) and exits non-zero when any probe fails or returns
+field-incomplete data. Run it manually or on a schedule to catch silent
+degradation — broken fetch dependencies, Reddit markup drift, extraction
+regressions.
 
 ## MCP Client
 

@@ -35,7 +35,7 @@ behind a central config flag for future probes.
 
 ```text
    any MCP client
-        │  calls a tool: fetch_thread / fetch_user / fetch_profile / fetch_rules / fetch_url
+        │  calls a tool: fetch_thread / fetch_user / fetch_rules / fetch_url
         ▼
    ┌──────────────────────────────────────┐
    │  veda  (MCP server, HTTP/SSE)         │   configured route ─► scrape HTML
@@ -83,14 +83,15 @@ explicit probes or if live health data shows the route has become useful again.)
 
 ## 5. What "done" looks like
 
-- ✅ A standalone **veda repo + MCP server** exposing five tools: `fetch_thread`, `fetch_user`, `fetch_profile`, `fetch_rules`, `fetch_url`.
+- ✅ A standalone **veda repo + MCP server** exposing four data tools: `fetch_thread`, `fetch_user` (activity + profile sidebar), `fetch_rules`, `fetch_url` — plus `health_status`.
 - ✅ **structured-first → HTML-fallback → identical shape** inside veda; field-complete parsers (scores, OP-flags, ids, timestamps).
 - ✅ **Strict isolation** — zero knowledge of any caller; depends on nothing external (boundary test enforces it).
 - ✅ One server, **one rate-limiter** + cache against the platform; robust parsing (deleted bodies, missing nodes, deep trees, pagination).
-- ✅ **Health monitoring** — per-tool/route success rates, `.json`-vs-HTML ratio, latency.
+- ✅ **Health monitoring** — per-tool/route success rates, `.json`-vs-HTML ratio, latency, fetch-tier availability.
+- ✅ **External fetch reliability** — every host tries the cheap request route first and escalates through working browser tiers; extraction returns markdown-style structured text with `title`/`truncated` metadata; a live canary (`scripts/veda-canary`) guards against silent degradation.
 - ✅ **Central scrape-route config** — Reddit JSON/HTML and external fetch tiers can be enabled or disabled without code changes.
 - ✅ **Local security posture** — loopback-only service, bearer-token-gated MCP traffic, private-network URL blocking, and conservative tool throttling.
-- ✅ Ops: **always-updated README** + a **`/veda-server` start/stop/status command**.
+- ✅ Ops: **always-updated README** + a **`/veda-server` start/stop/restart/status command**.
 - ✅ Service-ready: deploying to a real host later is just pointing the MCP config at a URL.
 
 ---
@@ -107,15 +108,15 @@ explicit probes or if live health data shows the route has become useful again.)
 
 Granular checkboxes in [`TECHNICAL_PRD.md` §9](./TECHNICAL_PRD.md):
 
-- [ ] **M0 — Stand up the veda repo + MCP server.** Init repo, port the scraping core, build the MCP server (5 tools, HTTP/SSE) + rate-limiter, README, `/veda-server` + launchd, boundary + parity-test harness.
-- [ ] **M1 — Field-complete thread parser (#1, #4).** HTML thread parse returns score/OP/id/created; shape-parity tests. *The keystone.*
-- [ ] **M2 — Rules + share links (#2, #3).** `fetch_rules` over HTML; `/s/` resolution.
-- [ ] **M3 — `fetch_user` + `fetch_profile` tools.**
-- [ ] **M4 — `fetch_url` (external) tool.**
-- [ ] **M5 — Health monitoring.** Success rates, route ratio, latency; status surface.
-- [ ] **M5.5 — Central scrape-route config.** Disable Reddit `.json` by default, keep route toggles for future probes.
-- [ ] **M6 — Local security hardening.** Loopback-only operation, local bearer token, private-network URL blocking, rate limits, and token-aware service scripts.
-- [ ] *(Later)* `.json`-drop decision (using M5 data); deploy the server to a real host.
+- [x] **M0 — Stand up the veda repo + MCP server.** Init repo, port the scraping core, build the MCP server (5 tools, HTTP/SSE) + rate-limiter, README, `/veda-server` + launchd, boundary + parity-test harness.
+- [x] **M1 — Field-complete thread parser (#1, #4).** HTML thread parse returns score/OP/id/created; shape-parity tests. *The keystone.*
+- [x] **M2 — Rules + share links (#2, #3).** `fetch_rules` over HTML; `/s/` resolution.
+- [x] **M3 — `fetch_user` + `fetch_profile` tools.** *(fetch_profile later merged into fetch_user.)*
+- [x] **M4 — `fetch_url` (external) tool.**
+- [x] **M5 — Health monitoring.** Success rates, route ratio, latency; status surface.
+- [x] **M5.5 — Central scrape-route config.** Disable Reddit `.json` by default, keep route toggles for future probes.
+- [x] **M6 — Local security hardening.** Loopback-only operation, local bearer token, private-network URL blocking, rate limits, and token-aware service scripts.
+- [x] *(Later)* `.json`-drop decision (using M5 data); deploy the server to a real host.
 
 Each milestone ships test-first, one reviewable PR, with your sign-off before the next.
 
@@ -127,7 +128,7 @@ Each milestone ships test-first, one reviewable PR, with your sign-off before th
 - **Strict isolation** — veda knows nothing about callers; depends on nothing external.
 - **Scope = pure platform reads;** Reddit-concrete now, generalise later.
 - **`.json` policy:** Reddit `.json` is disabled by default (`VEDA_REDDIT_JSON_ENABLED=0`) because current live probes return blocked HTML. Keep the implementation behind config for future probes.
-- **Local auth policy:** `run/veda-token` is a long-lived local bearer token. It does not expire automatically; it remains valid until deleted/replaced and the server is restarted. This is acceptable for local-only Hermes usage; remote deployment needs stronger production auth with explicit rotation/expiry.
+- **Local auth policy:** `run/veda-token` is a long-lived local bearer token. It does not expire automatically; it remains valid until deleted/replaced and the server is restarted. This is acceptable for local-only usage; remote deployment needs stronger production auth with explicit rotation/expiry.
 - Ops: always-updated README + `/veda-server` command.
 
 **Operator-side adoption** (MCP client, repointing, the feedback loop, removing the operator's own scraping) is tracked separately in `reddit-operator/docs/veda-integration/` — **not here**, because veda must stay caller-agnostic.

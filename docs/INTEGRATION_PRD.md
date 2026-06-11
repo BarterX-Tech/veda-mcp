@@ -59,18 +59,17 @@ Reddit `.json` disabled (`VEDA_REDDIT_JSON_ENABLED=0`) and Reddit HTML enabled
 
 ### 2.2 Tools
 
-Clients call six MCP tools:
+Clients call five MCP tools:
 
 | Tool | Use |
 | --- | --- |
 | `fetch_thread` | Get a Reddit post plus a comment tree. |
-| `fetch_user` | Get recent submitted posts and/or comments for a Reddit user. |
-| `fetch_profile` | Get profile/about bio text and linked external URLs for a Reddit user. |
+| `fetch_user` | Get a Reddit user's profile (bio, links, karma, account age) plus recent posts and/or comments. |
 | `fetch_rules` | Get subreddit rules. |
 | `fetch_url` | Get readable text for a generic web URL. |
 | `health_status` | Inspect service health metrics. |
 
-The first five are data-read tools. `health_status` is operational and should be used by clients,
+The first four are data-read tools. `health_status` is operational and should be used by clients,
 monitors, and deployment checks.
 
 ---
@@ -156,12 +155,13 @@ Client notes:
 fetch_user(username: str, kinds=("submitted", "comments"), pages: int = 2) -> UserResult
 ```
 
-Use when a client needs recent public Reddit activity for a username.
+Use when a client needs a Reddit user's public profile and/or recent activity.
 
 Output shape:
 
 ```text
 {
+  username, bio, links:[str], post_karma, comment_karma, created_utc,
   posts: [
     {type:"post", subreddit, title, score, created_utc, permalink}
   ],
@@ -174,8 +174,9 @@ Output shape:
 Client use cases:
 
 - Public activity summaries
-- Lightweight profile context
+- Profile context (bio, external links, karma, account age)
 - Community/activity analysis
+- External link discovery for follow-up `fetch_url` calls
 - Finding recent public comments or submissions for later `fetch_thread` calls
 
 Client notes:
@@ -183,33 +184,16 @@ Client notes:
 - Use `kinds=("comments",)` or `kinds=("submitted",)` when only one listing type is needed.
 - Use low `pages` values for interactive workflows; increase only for batch jobs.
 - veda may combine a successful structured listing with an HTML fallback for the other kind.
-
-### 4.3 `fetch_profile`
-
-```python
-fetch_profile(username: str) -> ProfileResult
-```
-
-Use when a client needs public profile/about text and explicit external links.
-
-Output shape:
-
-```text
-{ username, bio, links:[str] }
-```
-
-Client use cases:
-
-- Public bio extraction
-- External link discovery
-- Follow-up calls to `fetch_url`
-
-Client notes:
-
 - `links` excludes Reddit links and dedupes repeated URLs.
-- `bio` can be `null` when the page has no public profile text or the markup is empty.
+- `bio`, `post_karma`, `comment_karma`, and `created_utc` come from the profile
+  sidebar and are `null` when not present in the markup.
+- Profile fields are extracted from listing pages veda already fetches, so they
+  cost no extra requests on the default HTML route.
+- New-style profile bios and social links never appear in old.reddit markup;
+  when the sidebar has none, veda makes one stealth fetch of the new-reddit
+  profile page to fill `bio` and `links`.
 
-### 4.4 `fetch_rules`
+### 4.3 `fetch_rules`
 
 ```python
 fetch_rules(subreddit: str) -> list[Rule]
@@ -237,7 +221,7 @@ Client notes:
 - veda uses the configured Reddit routes. Local defaults skip structured rules JSON and use
   old.reddit HTML.
 
-### 4.5 `fetch_url`
+### 4.4 `fetch_url`
 
 ```python
 fetch_url(url: str, max_chars: int = 20000) -> ExternalDoc
@@ -248,7 +232,7 @@ Use when a client needs readable text from a non-Reddit web URL.
 Output shape:
 
 ```text
-{ url, status, route, content_type, text }
+{ url, status, route, content_type, text, title, truncated }
 ```
 
 Client use cases:
@@ -261,11 +245,17 @@ Client use cases:
 Client notes:
 
 - veda honors robots.txt.
-- GitHub repository URLs use the raw README route when available.
-- `max_chars` caps returned text for downstream token control.
-- `route` may be `github_raw`, `tier1`, `tier2`, or `tier3`.
+- GitHub repository root URLs use the raw README route when available.
+- `text` is markdown-style readable text with block separation (headings,
+  paragraphs); JS-rendered sites are handled by browser tiers automatically.
+- `title` is the extracted page title and may be `null`.
+- `max_chars` caps returned text for downstream token control; `truncated` is
+  `true` when the cap cut content, so clients can re-fetch with a larger budget
+  instead of treating the result as complete.
+- `route` may be `github_raw`, `tier1`, `tier2`, or `tier3`. Every host tries
+  the cheap `tier1` route first and escalates only when extracted text is thin.
 
-### 4.6 `health_status`
+### 4.5 `health_status`
 
 ```python
 health_status() -> dict
@@ -285,6 +275,7 @@ Output shape:
   routes: {...},
   json_vs_html: {json, html, html_ratio},
   scraping_config: {...},
+  tiers_available: {tier1: {available, detail}, tier2: {...}, tier3: {...}},
   totals: {calls, successes, errors}
 }
 ```
@@ -292,6 +283,8 @@ Output shape:
 Client use cases:
 
 - Confirm the server is reachable.
+- Confirm `tiers_available` before batch external reads — an unavailable tier
+  means the service environment is degraded.
 - Detect if Reddit `.json` routes are consistently blocked.
 - Detect parser or platform failures by rising error counts.
 - Decide whether a client batch should continue, slow down, or pause.
@@ -329,7 +322,7 @@ Use when a client needs a Reddit thread context bundle.
 Use when a client needs public user activity.
 
 1. Call `fetch_user(username, kinds=("submitted","comments"), pages=2)`.
-2. Optionally call `fetch_profile(username)`.
+2. Read profile fields (bio, links, karma, account age) from the same result.
 3. For each external profile link, call `fetch_url(link, max_chars=<budget>)`.
 4. Keep the profile/activity interpretation in the client.
 

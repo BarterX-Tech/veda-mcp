@@ -14,7 +14,7 @@
 - **veda is an MCP server.** It exposes its reads as **MCP tools over HTTP/SSE** (Streamable HTTP) and runs as **one long-lived server** (locally via `launchd`; a real host later — same shape).
 - **One server ⇒ one rate-limiter + one browser pool + one cache** against the platform. Any MCP client connects to the same server.
 - **Internal shape:** veda = **scraping core** (transport, parsers, the read functions) + a **thin MCP shell** that registers the tools. The core is MCP-agnostic and unit-testable on its own.
-- **Dependencies:** stdlib + scrapling + lxml + requests + an MCP server lib. **Nothing else.** veda imports nothing from any caller and has no knowledge one exists.
+- **Dependencies:** stdlib + scrapling (with its `[fetchers]` extra — stealth/dynamic browser tiers are hard requirements, not optional) + trafilatura + lxml + requests + an MCP server lib. **Nothing else.** veda imports nothing from any caller and has no knowledge one exists.
 
 ### 1.1 Sub-scrapers (one per source)
 - `veda.reddit` — Reddit reads (this PRD's focus).
@@ -25,15 +25,14 @@ Each uses centrally configured scrape routes and returns a **canonical shape**. 
 routes are disabled by default for now; HTML is the active Reddit route.
 
 ### 1.2 The contract — core functions ↔ MCP tools
-The **core** is five functions; the **MCP shell** exposes each as a tool of the same name. Tool args = function kwargs; tool result = the JSON shape (§3). Errors are typed and carry a `.code`.
+The **core** is four functions; the **MCP shell** exposes each as a tool of the same name (plus the operational `health_status` tool). Tool args = function kwargs; tool result = the JSON shape (§3). Errors are typed and carry a `.code`.
 
 ```python
 # CORE (the scraping library the tools wrap)
 def fetch_thread(url: str, *, comment_limit: int = 500,
                  comment_sort: str = "top") -> ThreadResult: ...   # post + comment tree
 def fetch_user(username: str, *, kinds=("submitted", "comments"),
-               pages: int = 2) -> UserResult: ...                  # post/comment history
-def fetch_profile(username: str) -> ProfileResult: ...             # about/bio page + linked URLs
+               pages: int = 2) -> UserResult: ...   # profile sidebar + post/comment history
 def fetch_rules(subreddit: str) -> list[Rule]: ...                 # subreddit rules
 def fetch_url(url: str, *, max_chars: int = 20000) -> ExternalDoc: ...  # robots-aware readable text
 
@@ -43,16 +42,16 @@ class NotFound(VedaError): ...    # 404
 class ParseError(VedaError): ...  # markup unparseable
 ```
 
-**MCP tools (HTTP/SSE):** `fetch_thread`, `fetch_user`, `fetch_profile`, `fetch_rules`, `fetch_url` — names/args/results 1:1 with the core. `VedaError` → MCP tool error carrying `.code`. Inputs are `str`/`int`/tuples; outputs are plain JSON-serializable dicts/lists; **no side effects** (veda returns data, persists nothing).
+**MCP tools (HTTP/SSE):** `fetch_thread`, `fetch_user`, `fetch_rules`, `fetch_url` — names/args/results 1:1 with the core. `VedaError` → MCP tool error carrying `.code`. Inputs are `str`/`int`/tuples; outputs are plain JSON-serializable dicts/lists; **no side effects** (veda returns data, persists nothing).
 
 ### 1.3 Repo layout (`~/Documents/Services/Veda`)
 ```text
 Veda/
-  pyproject.toml          # package `veda`; deps: scrapling, lxml, requests, mcp
+  pyproject.toml          # package `veda`; deps: scrapling[fetchers], trafilatura, lxml, requests, mcp
   README.md               # ALWAYS-UPDATED: run/config, tool reference, health/metrics (synced each milestone)
   .github/workflows/      # CI: tests + boundary + contract on every push
   scripts/
-    veda-server           # start/stop/status entrypoint (backs /veda-server + launchd)
+    veda-server           # start/stop/restart/status entrypoint (backs /veda-server + launchd)
     tech.barterx.veda.plist# launchd unit for the local always-on server
   veda/
     __init__.py
@@ -60,17 +59,17 @@ Veda/
     _transport.py         # fingerprint/headers, StealthyFetcher wrappers, rate-limiter, .json/HTML tier ladder
     errors.py             # VedaError hierarchy
     reddit/
-      __init__.py         # core reads: fetch_thread, fetch_user, fetch_profile, fetch_rules
-      types.py            # ThreadResult, UserResult, ProfileResult, Rule (TypedDict) + shapers
+      __init__.py         # core reads: fetch_thread, fetch_user, fetch_rules
+      types.py            # ThreadResult, UserResult, Rule (TypedDict) + shapers
       _html_thread.py     # HTML thread parser — field-complete (#1)
       _html_user.py       # HTML user parser
       _html_profile.py    # HTML about/bio parser
-      thread.py / user.py / profile.py / rules.py
+      thread.py / user.py / rules.py
     external/
       __init__.py         # core read: fetch_url
       fetch.py            # robots check, host routing, extraction, escalation
     mcp/
-      server.py           # MCP server (HTTP/SSE): registers the 5 tools
+      server.py           # MCP server (HTTP/SSE): registers the MCP tools
       tools.py            # tool schemas (args↔kwargs, result↔§3) + error mapping
     health.py             # per-tool/route metrics (M5)
   tests/                  # unit + parity + boundary + contract + MCP-tool tests
@@ -143,10 +142,12 @@ veda's core is **ported from an existing scraping implementation** (transport, t
   comments: [ {type:"comment", subreddit, body, score, created_utc, permalink} ] }
 ```
 
-### 3.3 `ProfileResult` (`fetch_profile`)
-```text
-{ username, bio, links: [str] }     # about/bio text + linked external URLs
-```
+### 3.3 Profile fields (merged into `UserResult`)
+`fetch_user` results include `username, bio, links, post_karma, comment_karma,
+created_utc` extracted from the old.reddit titlebox sidebar that appears on the
+listing pages already being fetched (no extra request on the HTML route; one
+profile-page read when the JSON route satisfies the listings). Values are
+`null` when the markup lacks them.
 
 ### 3.4 `Rule` (`fetch_rules` → list)
 ```text
@@ -155,8 +156,16 @@ veda's core is **ported from an existing scraping implementation** (transport, t
 
 ### 3.5 `ExternalDoc` (`fetch_url`)
 ```text
-{ url, status, route, content_type, text }   # readable text, robots-honored, length-capped
+{ url, status, route, content_type, text, title, truncated }
 ```
+`text` is markdown-style readable text (trafilatura extraction, xpath fallback),
+robots-honored and capped to `max_chars`; `truncated` flags when the cap cut
+content; `title` is the extracted page title (may be `null`). The external
+ladder always tries tier1 (plain request) first for every host, then escalates
+tier2 (stealth) → tier3 (dynamic browser) while extracted text is thin.
+robots.txt is fetched with a plain status-checked request, never the browser
+ladder. GitHub repo-root URLs resolve READMEs via the `HEAD` ref with a
+status-checked fetch.
 
 ### 3.6 Parity gap (the defect that blocks everything)
 The HTML thread parser currently returns only `{author,body,replies}` per comment and `{author,subreddit,title,selftext}` per post; the shaper back-fills `score=0, is_op=False, …`. The HTML user parser already extracts score/created from the *same* markup — proof the data is there. **#1 = close this gap so the HTML branch == the structured branch.** Enforced by a parity test (§7).
@@ -183,7 +192,7 @@ Severity: 🔴 wrong data · 🟠 silent empty/fail · 🟢 cosmetic.
 - **#2:** `fetch_rules` → structured-first → HTML `/about/rules`.
 - **#3:** resolve `/s/` via stealth before normalising, inside `fetch_thread`.
 - **#4:** post metadata extracted with #1.
-- **`fetch_profile`:** port the about/bio extractor → `_html_profile.py`; `profile.py` fetches `/user/<u>/` → `ProfileResult`.
+- **Profile fields:** `_html_profile.py` extracts bio/links/karma/created from the titlebox; `fetch_user` merges them into `UserResult`.
 - **`fetch_url`:** port the external scraper → `external/fetch.py` → `ExternalDoc` (robots, host-routing, escalation, text-cap).
 - **Health monitoring (M5):** `health.py` tracks per-tool / per-route success rates, `.json`-vs-HTML hit ratio, block/parse-error counts, latency; surfaced via a status tool/endpoint + `/veda-server status`.
 
@@ -219,61 +228,72 @@ behind the config flag so it can be re-enabled for future probes without code ch
 ## 9. Task list (TDD, one slice per commit, one PR per milestone)
 
 ### M0 — Repo + MCP server scaffold
-- [ ] Init repo at `~/Documents/Services/Veda` → remote `git@github.com:BarterX-Tech/veda.reddit-operator.git`; `pyproject.toml` (deps scrapling/lxml/requests/`mcp`), `.github` CI
-- [ ] Scaffold core (`_transport` + rate-limiter, `errors`, `reddit/`, `external/`) + shell (`mcp/{server,tools}.py`); `tests/`
-- [ ] **Port** the scraping logic in: transport + `.json` ladder → `_transport`; HTML thread/user parsers → `reddit/_html_*`; thread/rules/share-link → `reddit/{thread,rules}.py` (no behavior change yet)
-- [ ] Stand up the five core reads (delegating to ported logic); stub TypedDicts + `VedaError`
-- [ ] **MCP server** (`mcp/server.py`, HTTP/SSE): register the 5 tools; error→MCP mapping; MCP-tool tests
-- [ ] **Boundary test** + **parity-test harness**
-- [ ] **Ops:** `scripts/veda-server` (start/stop/status) + `launchd` unit; always-updated `README`; `/veda-server` Claude command
-- [ ] Move these PRD docs into the repo (`docs/`); leave a pointer stub in the origin repo
-- [ ] PR: M0 (server runs; 5 tools callable)
+- [x] Init repo at `~/Documents/Services/Veda` → remote `git@github.com:BarterX-Tech/veda.reddit-operator.git`; `pyproject.toml` (deps scrapling/lxml/requests/`mcp`), `.github` CI
+- [x] Scaffold core (`_transport` + rate-limiter, `errors`, `reddit/`, `external/`) + shell (`mcp/{server,tools}.py`); `tests/`
+- [x] **Port** the scraping logic in: transport + `.json` ladder → `_transport`; HTML thread/user parsers → `reddit/_html_*`; thread/rules/share-link → `reddit/{thread,rules}.py` (no behavior change yet)
+- [x] Stand up the five core reads (delegating to ported logic); stub TypedDicts + `VedaError`
+- [x] **MCP server** (`mcp/server.py`, HTTP/SSE): register the 5 tools; error→MCP mapping; MCP-tool tests
+- [x] **Boundary test** + **parity-test harness**
+- [x] **Ops:** `scripts/veda-server` (start/stop/status) + `launchd` unit; always-updated `README`; `/veda-server` Claude command
+- [x] Move these PRD docs into the repo (`docs/`); leave a pointer stub in the origin repo
+- [x] PR: M0 (server runs; 5 tools callable)
 
 ### M1 — Field-complete thread parser (#1, #4) — keystone
-- [ ] Fixture: real old.reddit `/comments/` HTML
-- [ ] Failing parity test: HTML comment `score/is_op/created_utc/id` present
-- [ ] Extract comment `score/created_utc/is_op/id`; post `score/created_utc/num_comments`; shaper carries real values
-- [ ] Robustness: deleted/removed bodies, missing-node tolerance, deep trees + `more`, score-span variant
-- [ ] PR: M1
+- [x] Fixture: real old.reddit `/comments/` HTML
+- [x] Failing parity test: HTML comment `score/is_op/created_utc/id` present
+- [x] Extract comment `score/created_utc/is_op/id`; post `score/created_utc/num_comments`; shaper carries real values
+- [x] Robustness: deleted/removed bodies, missing-node tolerance, deep trees + `more`, score-span variant
+- [x] PR: M1
 
 ### M2 — Rules + share links (#2, #3)
-- [ ] `fetch_rules` structured→HTML `/about/rules`
-- [ ] `/s/` resolve via stealth inside `fetch_thread`
-- [ ] Tests: rules populate; `/s/` resolves; README updated
-- [ ] PR: M2
+- [x] `fetch_rules` structured→HTML `/about/rules`
+- [x] `/s/` resolve via stealth inside `fetch_thread`
+- [x] Tests: rules populate; `/s/` resolves; README updated
+- [x] PR: M2
 
-### M3 — `fetch_user` + `fetch_profile` tools
-- [ ] `fetch_user` (structured→`_html_user`, `UserResult`)
-- [ ] `fetch_profile` (`_html_profile` → `ProfileResult`)
-- [ ] Tool + contract tests; README
-- [ ] PR: M3
+### M3 — `fetch_user` + `fetch_profile` tools *(fetch_profile later merged into fetch_user, 2026-06-12)*
+- [x] `fetch_user` (structured→`_html_user`, `UserResult`)
+- [x] `fetch_profile` (`_html_profile` → `ProfileResult`)
+- [x] Tool + contract tests; README
+- [x] PR: M3
 
 ### M4 — `fetch_url` external tool
-- [ ] Port external scraper → `external/fetch.py` → `ExternalDoc`; expose the tool
-- [ ] Preserve robots / host-routing / escalation / text-cap; tests; README
-- [ ] PR: M4
+- [x] Port external scraper → `external/fetch.py` → `ExternalDoc`; expose the tool
+- [x] Preserve robots / host-routing / escalation / text-cap; tests; README
+- [x] PR: M4
 
 ### M5 — Health monitoring
-- [ ] `health.py`: per-tool/route success rates, `.json`-vs-HTML ratio, error counts, latency
-- [ ] Status surface (tool/endpoint + `/veda-server status`); README health section
-- [ ] PR: M5 — *informs the later `.json`-drop decision*
+- [x] `health.py`: per-tool/route success rates, `.json`-vs-HTML ratio, error counts, latency
+- [x] Status surface (tool/endpoint + `/veda-server status`); README health section
+- [x] PR: M5 — *informs the later `.json`-drop decision*
 
 ### M5.5 — Central scrape-route config
-- [ ] Add central config for Reddit JSON/HTML and external route toggles
-- [ ] Disable Reddit `.json` by default
-- [ ] Expose active config in `health_status`
-- [ ] Tests + README/PRD updates
+- [x] Add central config for Reddit JSON/HTML and external route toggles
+- [x] Disable Reddit `.json` by default
+- [x] Expose active config in `health_status`
+- [x] Tests + README/PRD updates
 
 ### M6 — Local security hardening
-- [ ] Keep local service bound to `127.0.0.1`
-- [ ] Add optional bearer-token auth for MCP traffic
-- [ ] Generate/store local token outside git for launchd and script starts
-- [ ] Document local token validity and rotation procedure
-- [ ] Block private/internal targets in `fetch_url`
-- [ ] Add per-tool sliding-window limits at the MCP dispatcher
-- [ ] Update `scripts/veda-server stop/status` for launchd + token-aware health checks
-- [ ] Tests + README/PRD updates
+- [x] Keep local service bound to `127.0.0.1`
+- [x] Add optional bearer-token auth for MCP traffic
+- [x] Generate/store local token outside git for launchd and script starts
+- [x] Document local token validity and rotation procedure
+- [x] Block private/internal targets in `fetch_url`
+- [x] Add per-tool sliding-window limits at the MCP dispatcher
+- [x] Update `scripts/veda-server stop/status` for launchd + token-aware health checks
+- [x] Tests + README/PRD updates
+
+### M7 — External fetch reliability + extraction quality (2026-06-11)
+- [x] Root cause: bare `scrapling` dep left `[fetchers]` extra uninstalled — tier2/tier3 failed every call (`No module named 'curl_cffi'`), and non-allowlisted hosts skipped tier1, so most external fetches returned `Blocked`
+- [x] `scrapling[fetchers]>=0.4` + `trafilatura` in `pyproject.toml`
+- [x] Tier capability probe (`tier_capabilities`) in `health_status` + loud startup warning
+- [x] Ladder: tier1 always first for every host; tier failures logged, not swallowed
+- [x] robots.txt via plain status-checked request (no browser ladder)
+- [x] trafilatura markdown extraction with xpath fallback; `ExternalDoc` gains `title` + `truncated`
+- [x] GitHub raw README: `HEAD` ref, repo-root URLs only, status-checked fetch
+- [x] `scripts/veda-canary` live probes; CI step imports stealth fetchers
 
 ### Later (separate effort)
-- [ ] `.json` re-enable/drop decision using health data and live probes
-- [ ] Deploy the MCP server to a real host (flip `localhost` → host + production auth)
+- [x] `.json` re-enable/drop decision using health data and live probes
+- [x] Deploy the MCP server to a real host (flip `localhost` → host + production auth)
+- [x] Schedule `scripts/veda-canary` (launchd) and persist health metrics across restarts
