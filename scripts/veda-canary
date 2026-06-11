@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Live canary: verifies veda returns field-complete data from real sources.
+# Run manually or on a schedule; exits non-zero when any probe fails.
+cd "$(dirname "$0")/.."
+exec .venv/bin/python scripts/canary.py "$@"

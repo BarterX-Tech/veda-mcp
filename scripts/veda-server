@@ -14,7 +14,25 @@ PLIST="$ROOT/scripts/tech.barterx.veda.plist"
 LABEL="tech.barterx.veda"
 
 usage() {
-  echo "usage: scripts/veda-server {start|stop|status}"
+  echo "usage: scripts/veda-server {start|stop|restart|status}"
+}
+
+wait_for_unload() {
+  for _ in $(seq 1 40); do
+    launchd_loaded || return 0
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_port() {
+  for _ in $(seq 1 60); do
+    if curl -s -o /dev/null --max-time 1 "http://$HOST:$PORT/mcp"; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
 }
 
 is_running() {
@@ -63,6 +81,10 @@ case "${1:-}" in
       if ! launchd_loaded; then
         launchctl bootstrap "gui/$(id -u)" "$PLIST"
       fi
+      if ! wait_for_port; then
+        echo "veda server did not start listening on http://$HOST:$PORT" >&2
+        exit 1
+      fi
       echo "veda server launchd service active on http://$HOST:$PORT"
       echo "auth token file: $TOKEN_FILE"
       exit 0
@@ -74,12 +96,20 @@ case "${1:-}" in
     ensure_token
     VEDA_HOST="$HOST" VEDA_PORT="$PORT" nohup "$PYTHON" -m veda.mcp.server >"$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
+    if ! wait_for_port; then
+      echo "veda server did not start listening on http://$HOST:$PORT" >&2
+      exit 1
+    fi
     echo "veda server started on http://$HOST:$PORT (pid $(cat "$PID_FILE"))"
     echo "auth token file: $TOKEN_FILE"
     ;;
   stop)
     if [[ "$(uname -s)" == "Darwin" ]] && launchd_loaded; then
       launchctl bootout "gui/$(id -u)/$LABEL"
+      if ! wait_for_unload; then
+        echo "warning: launchd unit $LABEL still loaded after timeout" >&2
+        exit 1
+      fi
       rm -f "$PID_FILE"
       echo "veda server launchd service stopped"
       exit 0
@@ -92,6 +122,10 @@ case "${1:-}" in
       rm -f "$PID_FILE"
       echo "veda server is not running"
     fi
+    ;;
+  restart)
+    "${BASH_SOURCE[0]}" stop
+    exec "${BASH_SOURCE[0]}" start
     ;;
   status)
     ensure_token

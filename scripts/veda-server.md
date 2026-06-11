@@ -7,4 +7,4 @@ cd /Users/nitinkhanna/Documents/Services/Veda
 scripts/veda-server "$@"
 ```
 
-Supported actions: `start`, `stop`, `status`.
+Supported actions: `start`, `stop`, `restart`, `status`.
