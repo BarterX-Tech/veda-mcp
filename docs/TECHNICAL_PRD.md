@@ -234,7 +234,7 @@ behind the config flag so it can be re-enabled for future probes without code ch
 - [x] Stand up the five core reads (delegating to ported logic); stub TypedDicts + `VedaError`
 - [x] **MCP server** (`mcp/server.py`, HTTP/SSE): register the 5 tools; error→MCP mapping; MCP-tool tests
 - [x] **Boundary test** + **parity-test harness**
-- [x] **Ops:** `scripts/veda-server` (start/stop/status) + `launchd` unit; always-updated `README`; `/veda-server` Claude command
+- [x] **Ops:** `scripts/veda-server` (start/stop/restart/status) + `launchd` unit; always-updated `README`; `/veda-server` command wrapper
 - [x] Move these PRD docs into the repo (`docs/`); leave a pointer stub in the origin repo
 - [x] PR: M0 (server runs; 5 tools callable)
 
