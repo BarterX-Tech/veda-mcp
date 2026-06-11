@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from veda.external.fetch import fetch_url
-from veda.reddit import fetch_profile, fetch_rules, fetch_thread, fetch_user
+from veda.reddit import fetch_rules, fetch_thread, fetch_user
 
 
 def test_thread_result_is_canonical_and_json_serializable(monkeypatch) -> None:
@@ -33,21 +33,21 @@ def test_thread_result_is_canonical_and_json_serializable(monkeypatch) -> None:
 
 def test_other_core_results_are_json_serializable(monkeypatch) -> None:
     from veda.external import fetch as external_fetch
-    from veda.reddit import profile, rules, user
+    from veda.reddit import rules, user
 
     monkeypatch.setattr(user, "fetch_json", lambda url: None)
+    profile_html = (
+        "<html><body><div class='titlebox'><div class='usertext-body'>"
+        "hello https://example.com</div></div></body></html>"
+    )
     monkeypatch.setattr(
         user._html_user,
         "fetch_user_history",
-        lambda username, pages=2, fetch_html=None: {"posts": [], "comments": []},
-    )
-    monkeypatch.setattr(
-        profile,
-        "fetch_html",
-        lambda url: (
-            "<html><body><div class='titlebox'><div class='usertext-body'>"
-            "hello https://example.com</div></div></body></html>"
-        ),
+        lambda username, pages=2, fetch_html=None: {
+            "posts": [],
+            "comments": [],
+            "profile": user.extract_profile(profile_html),
+        },
     )
     monkeypatch.setattr(
         rules,
@@ -61,9 +61,13 @@ def test_other_core_results_are_json_serializable(monkeypatch) -> None:
         lambda url, tier: "<article>Readable page text " * 20,
     )
 
+    user_result = fetch_user("alice")
+    assert user_result["username"] == "alice"
+    assert user_result["bio"].startswith("hello")
+    assert "https://example.com" in user_result["links"]
+
     results = [
-        fetch_user("alice"),
-        fetch_profile("alice"),
+        user_result,
         fetch_rules("macapps"),
         fetch_url("https://example.com", max_chars=80, security_check=lambda url: None),
     ]

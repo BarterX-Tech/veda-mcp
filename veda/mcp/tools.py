@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from typing import Any
@@ -7,7 +8,6 @@ from typing import Any
 from veda import external as external_fetch
 from veda import health
 from veda.errors import VedaError
-from veda.reddit import profile as reddit_profile
 from veda.reddit import rules as reddit_rules
 from veda.reddit import thread as reddit_thread
 from veda.reddit import user as reddit_user
@@ -28,7 +28,7 @@ def _tuple_arg(value: Any, default: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(value)
 
 
-async def _fetch_thread(args: dict[str, Any]) -> Any:
+def _fetch_thread(args: dict[str, Any]) -> Any:
     return reddit_thread.fetch_thread(
         str(args["url"]),
         comment_limit=int(args.get("comment_limit", 500)),
@@ -36,7 +36,7 @@ async def _fetch_thread(args: dict[str, Any]) -> Any:
     )
 
 
-async def _fetch_user(args: dict[str, Any]) -> Any:
+def _fetch_user(args: dict[str, Any]) -> Any:
     return reddit_user.fetch_user(
         str(args["username"]),
         kinds=_tuple_arg(args.get("kinds"), ("submitted", "comments")),
@@ -44,29 +44,24 @@ async def _fetch_user(args: dict[str, Any]) -> Any:
     )
 
 
-async def _fetch_profile(args: dict[str, Any]) -> Any:
-    return reddit_profile.fetch_profile(str(args["username"]))
-
-
-async def _fetch_rules(args: dict[str, Any]) -> Any:
+def _fetch_rules(args: dict[str, Any]) -> Any:
     return reddit_rules.fetch_rules(str(args["subreddit"]))
 
 
-async def _fetch_url(args: dict[str, Any]) -> Any:
+def _fetch_url(args: dict[str, Any]) -> Any:
     return external_fetch.fetch_url(
         str(args["url"]),
         max_chars=int(args.get("max_chars", 20000)),
     )
 
 
-async def _health_status(args: dict[str, Any]) -> Any:
+def _health_status(args: dict[str, Any]) -> Any:
     return health.snapshot()
 
 
 TOOL_HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "fetch_thread": _fetch_thread,
     "fetch_user": _fetch_user,
-    "fetch_profile": _fetch_profile,
     "fetch_rules": _fetch_rules,
     "fetch_url": _fetch_url,
     "health_status": _health_status,
@@ -75,7 +70,6 @@ TOOL_HANDLERS: dict[str, Callable[[dict[str, Any]], Any]] = {
 TOOL_RATE_LIMITS: dict[str, tuple[int, float]] = {
     "fetch_thread": (30, 60.0),
     "fetch_user": (20, 60.0),
-    "fetch_profile": (60, 60.0),
     "fetch_rules": (60, 60.0),
     "fetch_url": (30, 60.0),
     "health_status": (120, 60.0),
@@ -116,7 +110,7 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> Any:
     started = time.monotonic()
     try:
         _check_tool_rate_limit(name)
-        result = await TOOL_HANDLERS[name](arguments or {})
+        result = await asyncio.to_thread(TOOL_HANDLERS[name], arguments or {})
     except ToolError as exc:
         health.record(
             name,

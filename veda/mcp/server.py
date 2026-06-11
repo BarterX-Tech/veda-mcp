@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Awaitable, Callable
 from hmac import compare_digest
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from veda._transport import tier_capabilities
 from veda.mcp import tools
 
 Receive = Callable[[], Awaitable[dict[str, Any]]]
@@ -53,7 +55,6 @@ HOME_HTML = """<!doctype html>
       <ul>
         <li><code>fetch_thread</code></li>
         <li><code>fetch_user</code></li>
-        <li><code>fetch_profile</code></li>
         <li><code>fetch_rules</code></li>
         <li><code>fetch_url</code></li>
         <li><code>health_status</code></li>
@@ -166,10 +167,6 @@ def create_server() -> FastMCP:
         )
 
     @server.tool()
-    async def fetch_profile(username: str) -> dict:
-        return await tools.call_tool("fetch_profile", {"username": username})
-
-    @server.tool()
     async def fetch_rules(subreddit: str) -> list[dict]:
         return await tools.call_tool("fetch_rules", {"subreddit": subreddit})
 
@@ -211,7 +208,19 @@ def _auth_token() -> str | None:
     return token or None
 
 
+def warn_unavailable_tiers() -> list[str]:
+    warnings = [
+        f"{tier} unavailable: {info['detail']}"
+        for tier, info in tier_capabilities(refresh=True).items()
+        if not info["available"]
+    ]
+    for warning in warnings:
+        sys.stderr.write(f"[veda] WARNING: fetch {warning}\n")
+    return warnings
+
+
 def main() -> None:
+    warn_unavailable_tiers()
     server = create_server()
     host = os.environ.get("VEDA_HOST", "127.0.0.1")
     port = int(os.environ.get("VEDA_PORT", "8765"))

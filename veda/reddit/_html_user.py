@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import lxml.html
@@ -36,6 +37,11 @@ def _created(thing) -> float:
     timestamp = thing.get("data-timestamp")
     if timestamp and timestamp.isdigit():
         return int(timestamp) / 1000.0
+    for value in thing.xpath(".//time/@datetime"):
+        try:
+            return datetime.fromisoformat(value).timestamp()
+        except ValueError:
+            continue
     return 0.0
 
 
@@ -92,13 +98,16 @@ def parse_user_listing(html: str) -> dict:
     return {"items": items, "after": after}
 
 
-def fetch_user_items(username: str, kind: str, *, pages: int = 2, fetch_html=None) -> list[dict]:
+def fetch_user_items(
+    username: str, kind: str, *, pages: int = 2, fetch_html=None
+) -> tuple[list[dict], str | None]:
     if fetch_html is None:
         from veda._transport import fetch_html as default_fetch_html
 
         fetch_html = default_fetch_html
 
     items: list[dict] = []
+    first_html: str | None = None
     after = None
     for _ in range(pages):
         url = _USER_URL.format(u=username, kind=kind)
@@ -107,18 +116,29 @@ def fetch_user_items(username: str, kind: str, *, pages: int = 2, fetch_html=Non
         html = fetch_html(url)
         if not html:
             break
+        if first_html is None:
+            first_html = html
         parsed = parse_user_listing(html)
         items.extend(parsed["items"])
         after = parsed["after"]
         if not after:
             break
-    return items
+    return items, first_html
 
 
 def fetch_user_history(username: str, *, pages: int = 2, fetch_html=None) -> dict:
-    submitted = fetch_user_items(username, "submitted", pages=pages, fetch_html=fetch_html)
-    comments = fetch_user_items(username, "comments", pages=pages, fetch_html=fetch_html)
+    from veda.reddit._html_profile import extract_profile
+
+    submitted, submitted_html = fetch_user_items(
+        username, "submitted", pages=pages, fetch_html=fetch_html
+    )
+    comments, comments_html = fetch_user_items(
+        username, "comments", pages=pages, fetch_html=fetch_html
+    )
+    # Listing pages carry the same titlebox sidebar as the profile page, so
+    # profile data costs no extra request here.
     return {
         "posts": [item for item in submitted if item["type"] == "post"],
         "comments": [item for item in comments if item["type"] == "comment"],
+        "profile": extract_profile(submitted_html or comments_html or ""),
     }

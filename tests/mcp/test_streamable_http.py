@@ -61,7 +61,6 @@ def test_streamable_http_server_lists_and_calls_status_tool() -> None:
                     assert {tool.name for tool in listed.tools} == {
                         "fetch_thread",
                         "fetch_user",
-                        "fetch_profile",
                         "fetch_rules",
                         "fetch_url",
                         "health_status",

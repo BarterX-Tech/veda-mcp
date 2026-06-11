@@ -83,14 +83,16 @@ class UserComment(TypedDict):
 
 
 class UserResult(TypedDict):
+    username: str
+    bio: str | None
+    links: list[str]
+    post_karma: int | None
+    comment_karma: int | None
+    created_utc: float | None
     posts: list[UserPost]
     comments: list[UserComment]
 
 
-class ProfileResult(TypedDict):
-    username: str
-    bio: str | None
-    links: list[str]
 
 
 class ExternalDoc(TypedDict):
@@ -99,6 +101,8 @@ class ExternalDoc(TypedDict):
     route: str
     content_type: str
     text: str
+    title: str | None
+    truncated: bool
 
 
 JsonDict = dict[str, Any]

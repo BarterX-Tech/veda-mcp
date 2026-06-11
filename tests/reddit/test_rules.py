@@ -29,6 +29,38 @@ def test_fetch_rules_falls_back_to_html_when_json_empty() -> None:
     ]
 
 
+MODTOOLS_RULES_HTML = """
+<html><body class="modtools-page">
+  <div class="subreddit-rule-item" data-priority="0"
+       data-description="Search before posting. Choose flair."
+       data-violation-reason="Read Before Posting" data-kind="link">
+    <div class="subreddit-rule "><div class="subreddit-rule-contents">
+      <div class="subreddit-rule-content-number">1</div>
+    </div></div>
+  </div>
+  <div class="subreddit-rule-item" data-priority="1"
+       data-description="No referral or affiliate links."
+       data-violation-reason="No Affiliate Links" data-kind="all">
+    <div class="subreddit-rule "></div>
+  </div>
+</body></html>
+"""
+
+
+def test_parse_rules_html_reads_modtools_data_attributes() -> None:
+    # Current old.reddit /about/rules/ markup: subreddit-rule-item divs with
+    # the rule content in data attributes, no short-name/description classes.
+    result = rules._parse_rules_html(MODTOOLS_RULES_HTML)
+
+    assert result == [
+        {
+            "short_name": "Read Before Posting",
+            "description": "Search before posting. Choose flair.",
+        },
+        {"short_name": "No Affiliate Links", "description": "No referral or affiliate links."},
+    ]
+
+
 def test_fetch_rules_uses_json_when_populated(monkeypatch) -> None:
     monkeypatch.setenv("VEDA_REDDIT_JSON_ENABLED", "1")
 

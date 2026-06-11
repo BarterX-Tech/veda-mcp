@@ -11,11 +11,10 @@ from veda.mcp.server import create_server
 from veda.security import SlidingWindowRateLimiter
 
 
-def test_tool_registry_has_five_tools() -> None:
+def test_tool_registry_has_expected_tools() -> None:
     assert set(tools.TOOL_HANDLERS) == {
         "fetch_thread",
         "fetch_user",
-        "fetch_profile",
         "fetch_rules",
         "fetch_url",
         "health_status",
@@ -46,6 +45,30 @@ def test_call_tool_delegates_to_core(monkeypatch) -> None:
     snapshot = health.snapshot()
     assert snapshot["tools"]["fetch_thread"]["successes"] == 1
     assert snapshot["routes"]["html"] == 1
+
+
+def test_call_tool_runs_core_off_the_event_loop(monkeypatch) -> None:
+    """Sync core (incl. Playwright sync API) must not run inside the event loop."""
+    health.reset()
+
+    def fake_fetch_url(url, max_chars=20000):
+        with pytest.raises(RuntimeError):
+            asyncio.get_running_loop()
+        return {
+            "url": url,
+            "status": 200,
+            "route": "tier1",
+            "content_type": "text/html",
+            "text": "ok",
+            "title": None,
+            "truncated": False,
+        }
+
+    monkeypatch.setattr(tools.external_fetch, "fetch_url", fake_fetch_url)
+
+    result = asyncio.run(tools.call_tool("fetch_url", {"url": "https://example.com"}))
+
+    assert result["text"] == "ok"
 
 
 def test_call_tool_maps_veda_error(monkeypatch) -> None:
@@ -96,12 +119,16 @@ def test_fastmcp_server_lists_and_calls_all_tools(monkeypatch) -> None:
     monkeypatch.setattr(
         tools.reddit_user,
         "fetch_user",
-        lambda username, kinds=("submitted", "comments"), pages=2: {"posts": [], "comments": []},
-    )
-    monkeypatch.setattr(
-        tools.reddit_profile,
-        "fetch_profile",
-        lambda username: {"username": username, "bio": None, "links": []},
+        lambda username, kinds=("submitted", "comments"), pages=2: {
+            "username": username,
+            "bio": None,
+            "links": [],
+            "post_karma": None,
+            "comment_karma": None,
+            "created_utc": None,
+            "posts": [],
+            "comments": [],
+        },
     )
     monkeypatch.setattr(tools.reddit_rules, "fetch_rules", lambda subreddit: [])
     monkeypatch.setattr(
@@ -123,7 +150,6 @@ def test_fastmcp_server_lists_and_calls_all_tools(monkeypatch) -> None:
         calls = {
             "fetch_thread": {"url": "https://old.reddit.com/r/x/comments/abc/t/"},
             "fetch_user": {"username": "alice"},
-            "fetch_profile": {"username": "alice"},
             "fetch_rules": {"subreddit": "macapps"},
             "fetch_url": {"url": "https://example.com"},
             "health_status": {},

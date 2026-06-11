@@ -60,6 +60,7 @@ def test_fetch_user_skips_json_when_disabled(monkeypatch) -> None:
 
     monkeypatch.delenv("VEDA_REDDIT_JSON_ENABLED", raising=False)
     monkeypatch.setattr(user, "fetch_json", fake_json)
+    monkeypatch.setattr(user, "_fetch_new_profile_html", lambda url: None)
     monkeypatch.setattr(
         user._html_user,
         "fetch_user_history",

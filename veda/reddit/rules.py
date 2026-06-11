@@ -32,6 +32,21 @@ def _parse_rules_html(html: str) -> list[Rule]:
     doc = lxml.html.fromstring(html)
     rules: list[Rule] = []
     seen: set[tuple[str, str]] = set()
+
+    # Current old.reddit /about/rules/ markup: rule content lives in data
+    # attributes on subreddit-rule-item divs.
+    for node in doc.xpath(
+        "//*[contains(concat(' ', normalize-space(@class), ' '), ' subreddit-rule-item ')]"
+    ):
+        short_name = " ".join((node.get("data-violation-reason") or "").split())
+        description = " ".join((node.get("data-description") or "").split())
+        key = (short_name, description)
+        if (short_name or description) and key not in seen:
+            seen.add(key)
+            rules.append({"short_name": short_name, "description": description})
+    if rules:
+        return rules
+
     for node in doc.xpath(
         "//*[contains(concat(' ', normalize-space(@class), ' '), ' rule-item ')"
         " or contains(concat(' ', normalize-space(@class), ' '), ' rule ')]"
