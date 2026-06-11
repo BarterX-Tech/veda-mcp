@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.veda-mcp.canary</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__VEDA_ROOT__/.venv/bin/python</string>
+    <string>scripts/canary.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__VEDA_ROOT__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VEDA_CANARY_NOTIFY</key>
+    <string>1</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__VEDA_LOG_FILE__</string>
+  <key>StandardErrorPath</key>
+  <string>__VEDA_LOG_FILE__</string>
+</dict>
+</plist>

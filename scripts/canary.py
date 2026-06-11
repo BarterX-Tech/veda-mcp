@@ -8,6 +8,8 @@ Exit code 0 = all probes passed, 1 = at least one failed.
 """
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import traceback
 
@@ -79,9 +81,25 @@ def main() -> int:
             print(f"ok   {name}")
     if failures:
         print(f"{failures}/{len(probes)} canary probes FAILED")
+        _notify_failure(failures, len(probes))
         return 1
     print("all canary probes passed")
     return 0
+
+
+def _notify_failure(failures: int, total: int) -> None:
+    """Desktop alert for scheduled runs (VEDA_CANARY_NOTIFY=1, macOS only)."""
+    if not os.environ.get("VEDA_CANARY_NOTIFY") or sys.platform != "darwin":
+        return
+    message = (
+        f"{failures}/{total} canary probes FAILED — "
+        "see ~/Library/Logs/veda-canary.log"
+    )
+    script = f'display notification "{message}" with title "veda-mcp" sound name "Basso"'
+    try:
+        subprocess.run(["osascript", "-e", script], check=False, timeout=10)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

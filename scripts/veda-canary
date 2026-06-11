@@ -1,5 +1,41 @@
 #!/usr/bin/env bash
 # Live canary: verifies veda returns field-complete data from real sources.
-# Run manually or on a schedule; exits non-zero when any probe fails.
-cd "$(dirname "$0")/.."
-exec .venv/bin/python scripts/canary.py "$@"
+#   run         execute the probes once (default); exits non-zero on failure
+#   schedule    install a daily 08:30 launchd job (macOS) with failure alerts
+#   unschedule  remove the scheduled job
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+ROOT="$(pwd)"
+LABEL="local.veda-mcp.canary"
+PLIST="$ROOT/run/$LABEL.plist"
+LOG="$HOME/Library/Logs/veda-canary.log"
+
+case "${1:-run}" in
+  run)
+    exec .venv/bin/python scripts/canary.py
+    ;;
+  schedule)
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+      echo "schedule uses launchd (macOS); use cron on other systems:" >&2
+      echo "  30 8 * * * cd $ROOT && .venv/bin/python scripts/canary.py >> ~/veda-canary.log 2>&1" >&2
+      exit 1
+    fi
+    mkdir -p "$ROOT/run"
+    sed -e "s|__VEDA_ROOT__|$ROOT|g" -e "s|__VEDA_LOG_FILE__|$LOG|g" \
+      "$ROOT/scripts/canary.launchd.plist.template" > "$PLIST"
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+    echo "canary scheduled daily at 08:30 (label $LABEL, log $LOG)"
+    ;;
+  unschedule)
+    if launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null; then
+      echo "canary unscheduled"
+    else
+      echo "canary was not scheduled"
+    fi
+    ;;
+  *)
+    echo "usage: scripts/veda-canary [run|schedule|unschedule]"
+    exit 2
+    ;;
+esac

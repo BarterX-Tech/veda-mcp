@@ -109,9 +109,19 @@ environment). Use the `health_status()` MCP tool or
 
 `scripts/veda-canary` runs live probes (tier availability, two external URLs,
 subreddit rules, one archived Reddit thread) and exits non-zero when any
-probe fails or returns field-incomplete data. Run it manually or on a
-schedule to catch silent degradation — broken fetch dependencies, Reddit
-markup drift, extraction regressions.
+probe fails or returns field-incomplete data — catching silent degradation
+like broken fetch dependencies, Reddit markup drift, or extraction
+regressions.
+
+```bash
+scripts/veda-canary              # run the probes once
+scripts/veda-canary schedule     # macOS: daily 08:30 launchd job + desktop alert on failure
+scripts/veda-canary unschedule   # remove the scheduled job
+```
+
+Scheduled runs log to `~/Library/Logs/veda-canary.log` and raise a desktop
+notification when probes fail. On non-macOS systems, the `schedule` command
+prints an equivalent cron line.
 
 ## MCP Client
 
