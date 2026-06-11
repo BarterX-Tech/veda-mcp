@@ -4,15 +4,15 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>tech.barterx.veda</string>
+  <string>local.veda-mcp</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/nitinkhanna/Documents/Services/Veda/.venv/bin/python</string>
+    <string>__VEDA_ROOT__/.venv/bin/python</string>
     <string>-m</string>
     <string>veda.mcp.server</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/nitinkhanna/Documents/Services/Veda</string>
+  <string>__VEDA_ROOT__</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>VEDA_HOST</key>
@@ -20,15 +20,15 @@
     <key>VEDA_PORT</key>
     <string>8765</string>
     <key>VEDA_TOKEN_FILE</key>
-    <string>/Users/nitinkhanna/Documents/Services/Veda/run/veda-token</string>
+    <string>__VEDA_ROOT__/run/veda-token</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/nitinkhanna/Library/Logs/veda-server.log</string>
+  <string>__VEDA_LOG_FILE__</string>
   <key>StandardErrorPath</key>
-  <string>/Users/nitinkhanna/Library/Logs/veda-server.log</string>
+  <string>__VEDA_LOG_FILE__</string>
 </dict>
 </plist>

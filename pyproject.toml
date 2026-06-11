@@ -5,9 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "veda"
 version = "0.1.0"
-description = "Standalone Reddit and web scraping MCP service."
+description = "Caller-agnostic MCP server for public Reddit and web reads — structured JSON from threads, users, rules, and any public URL."
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
+keywords = ["mcp", "mcp-server", "reddit", "scraping", "web-reader"]
 dependencies = [
   "lxml>=5.0",
   "mcp>=1.0",
@@ -21,6 +23,10 @@ dev = [
   "pytest>=8.0",
   "ruff>=0.6",
 ]
+
+[project.urls]
+Homepage = "https://github.com/BarterX-Tech/veda-mcp"
+Issues = "https://github.com/BarterX-Tech/veda-mcp/issues"
 
 [project.scripts]
 veda-mcp = "veda.mcp.server:main"

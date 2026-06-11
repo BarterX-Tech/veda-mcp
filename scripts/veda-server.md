@@ -1,9 +1,8 @@
 # /veda-server
 
-Thin wrapper for Claude command setups:
+Thin wrapper for Claude command setups (run from the repository root):
 
 ```bash
-cd /Users/nitinkhanna/Documents/Services/Veda
 scripts/veda-server "$@"
 ```
 

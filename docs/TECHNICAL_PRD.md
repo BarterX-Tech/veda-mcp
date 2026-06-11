@@ -10,7 +10,7 @@
 ## 1. Architecture
 
 ### 1.0 Repository, runtime, integration
-- **Repo:** `git@github.com:BarterX-Tech/veda.reddit-operator.git` · **Path:** `~/Documents/Services/Veda`
+- **Repo:** `https://github.com/BarterX-Tech/veda-mcp`
 - **veda is an MCP server.** It exposes its reads as **MCP tools over HTTP/SSE** (Streamable HTTP) and runs as **one long-lived server** (locally via `launchd`; a real host later — same shape).
 - **One server ⇒ one rate-limiter + one browser pool + one cache** against the platform. Any MCP client connects to the same server.
 - **Internal shape:** veda = **scraping core** (transport, parsers, the read functions) + a **thin MCP shell** that registers the tools. The core is MCP-agnostic and unit-testable on its own.
@@ -44,7 +44,7 @@ class ParseError(VedaError): ...  # markup unparseable
 
 **MCP tools (HTTP/SSE):** `fetch_thread`, `fetch_user`, `fetch_rules`, `fetch_url` — names/args/results 1:1 with the core. `VedaError` → MCP tool error carrying `.code`. Inputs are `str`/`int`/tuples; outputs are plain JSON-serializable dicts/lists; **no side effects** (veda returns data, persists nothing).
 
-### 1.3 Repo layout (`~/Documents/Services/Veda`)
+### 1.3 Repo layout
 ```text
 Veda/
   pyproject.toml          # package `veda`; deps: scrapling[fetchers], trafilatura, lxml, requests, mcp
@@ -52,7 +52,7 @@ Veda/
   .github/workflows/      # CI: tests + boundary + contract on every push
   scripts/
     veda-server           # start/stop/restart/status entrypoint (backs /veda-server + launchd)
-    tech.barterx.veda.plist# launchd unit for the local always-on server
+    launchd.plist.template# rendered to run/ by veda-server for the local always-on service
   veda/
     __init__.py
     config.py             # central scrape-route flags (Reddit JSON/HTML, external tiers)
@@ -228,7 +228,7 @@ behind the config flag so it can be re-enabled for future probes without code ch
 ## 9. Task list (TDD, one slice per commit, one PR per milestone)
 
 ### M0 — Repo + MCP server scaffold
-- [x] Init repo at `~/Documents/Services/Veda` → remote `git@github.com:BarterX-Tech/veda.reddit-operator.git`; `pyproject.toml` (deps scrapling/lxml/requests/`mcp`), `.github` CI
+- [x] Init repo at `~/Documents/Services/Veda` → remote `https://github.com/BarterX-Tech/veda-mcp`; `pyproject.toml` (deps scrapling/lxml/requests/`mcp`), `.github` CI
 - [x] Scaffold core (`_transport` + rate-limiter, `errors`, `reddit/`, `external/`) + shell (`mcp/{server,tools}.py`); `tests/`
 - [x] **Port** the scraping logic in: transport + `.json` ladder → `_transport`; HTML thread/user parsers → `reddit/_html_*`; thread/rules/share-link → `reddit/{thread,rules}.py` (no behavior change yet)
 - [x] Stand up the five core reads (delegating to ported logic); stub TypedDicts + `VedaError`

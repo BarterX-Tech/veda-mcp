@@ -14,7 +14,7 @@ The zoom-out picture of **veda**: what it is, the one job it does, and what "don
 
 **veda** is a standalone **platform-read service**. Give it a URL, a username, or a subreddit; it returns clean, structured data. Starting with Reddit (`veda.reddit`), with generic web (`veda.external`) and future platforms (`veda.x`, …) as sibling sub-scrapers.
 
-- **Repo:** `git@github.com:BarterX-Tech/veda.reddit-operator.git` · **Path:** `~/Documents/Services/Veda`
+- **Repo:** `https://github.com/BarterX-Tech/veda-mcp`
 - **Interface:** an **MCP server over HTTP/SSE** exposing a few read tools.
 - **Runs as** one long-lived server (locally via `launchd`; a real host later).
 
@@ -131,6 +131,6 @@ Each milestone ships test-first, one reviewable PR, with your sign-off before th
 - **Local auth policy:** `run/veda-token` is a long-lived local bearer token. It does not expire automatically; it remains valid until deleted/replaced and the server is restarted. This is acceptable for local-only usage; remote deployment needs stronger production auth with explicit rotation/expiry.
 - Ops: always-updated README + `/veda-server` command.
 
-**Operator-side adoption** (MCP client, repointing, the feedback loop, removing the operator's own scraping) is tracked separately in `reddit-operator/docs/veda-integration/` — **not here**, because veda must stay caller-agnostic.
+**Caller-side adoption** (MCP client config, repointing, removing any caller's own scraping) is tracked in each consuming project's own docs — **not here**, because veda must stay caller-agnostic.
 
 **Ready to begin M0.**

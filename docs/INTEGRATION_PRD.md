@@ -358,7 +358,7 @@ Use before scheduled or high-volume reads.
 ### 7.1 Local Development
 
 ```bash
-uv venv --python /Users/nitinkhanna/.local/bin/python3.11
+uv venv --python 3.11
 uv pip install -e ".[dev]"
 scripts/veda-server start
 scripts/veda-server status
