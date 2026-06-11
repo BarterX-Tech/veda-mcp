@@ -123,6 +123,22 @@ Scheduled runs log to `~/Library/Logs/veda-canary.log` and raise a desktop
 notification when probes fail. On non-macOS systems, the `schedule` command
 prints an equivalent cron line.
 
+### Daily email report (optional)
+
+`scripts/veda-report` emails a daily health summary via
+[Resend](https://resend.com). Configuration is read from a **gitignored** env
+file — no secrets or addresses are stored in the repo:
+
+```bash
+cp run/veda-mail.env.example run/veda-mail.env   # then fill in real values
+scripts/veda-report send                          # send once now
+scripts/veda-report schedule                       # macOS: daily 09:00 launchd job
+scripts/veda-report unschedule                     # remove it
+```
+
+`run/veda-mail.env` holds `RESEND_API_KEY`, `VEDA_REPORT_FROM` (a sender on a
+Resend-verified domain), and `VEDA_REPORT_TO`. Keep it out of version control.
+
 ## MCP Client
 
 Point an MCP Streamable HTTP client at:
