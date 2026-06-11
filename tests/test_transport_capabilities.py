@@ -58,6 +58,32 @@ def test_stealth_fetch_dependencies_are_installed() -> None:
     assert caps["tier3"]["available"] is True, caps["tier3"]["detail"]
 
 
+def test_server_refuses_non_loopback_bind_without_token(monkeypatch) -> None:
+    from veda.mcp import server
+
+    monkeypatch.setenv("VEDA_HOST", "0.0.0.0")
+    monkeypatch.delenv("VEDA_AUTH_TOKEN", raising=False)
+    monkeypatch.setenv("VEDA_TOKEN_FILE", "/nonexistent/token")
+
+    import pytest
+
+    with pytest.raises(SystemExit):
+        server.ensure_safe_bind("0.0.0.0", server._auth_token())
+
+
+def test_server_allows_loopback_bind_without_token() -> None:
+    from veda.mcp import server
+
+    server.ensure_safe_bind("127.0.0.1", None)
+    server.ensure_safe_bind("::1", None)
+
+
+def test_server_allows_non_loopback_bind_with_token() -> None:
+    from veda.mcp import server
+
+    server.ensure_safe_bind("0.0.0.0", "some-token")
+
+
 def test_health_snapshot_includes_tiers_available() -> None:
     health.reset()
 

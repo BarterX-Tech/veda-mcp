@@ -208,6 +208,22 @@ def _auth_token() -> str | None:
     return token or None
 
 
+def ensure_safe_bind(host: str, token: str | None) -> None:
+    """Refuse to serve a non-loopback address without bearer auth.
+
+    Without this, VEDA_HOST=0.0.0.0 and no token would expose an
+    unauthenticated scraping proxy to the network.
+    """
+    loopback = host in ("localhost", "::1") or host.startswith("127.")
+    if loopback or token:
+        return
+    sys.stderr.write(
+        f"[veda] FATAL: refusing to bind {host} without auth. "
+        "Set VEDA_AUTH_TOKEN (or VEDA_TOKEN_FILE) or bind a loopback address.\n"
+    )
+    raise SystemExit(2)
+
+
 def warn_unavailable_tiers() -> list[str]:
     warnings = [
         f"{tier} unavailable: {info['detail']}"
@@ -221,8 +237,9 @@ def warn_unavailable_tiers() -> list[str]:
 
 def main() -> None:
     warn_unavailable_tiers()
-    server = create_server()
     host = os.environ.get("VEDA_HOST", "127.0.0.1")
+    ensure_safe_bind(host, _auth_token())
+    server = create_server()
     port = int(os.environ.get("VEDA_PORT", "8765"))
     server.settings.host = host
     server.settings.port = port

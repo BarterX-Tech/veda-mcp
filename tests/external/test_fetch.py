@@ -42,6 +42,56 @@ def test_fetch_robots_text_requires_status_200(monkeypatch) -> None:
     assert "Disallow" in fetch.fetch_robots_text("https://x.com/robots.txt")
 
 
+def test_tier1_redirect_to_internal_host_is_blocked(monkeypatch) -> None:
+    # A public URL must not be allowed to 302 into private/metadata space.
+    class FakeResponse:
+        def __init__(self, status_code, headers=None, text=""):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self.text = text
+            self.is_redirect = status_code in (301, 302, 303, 307, 308)
+
+    responses = {
+        "https://evil.example/": FakeResponse(302, {"location": "http://169.254.169.254/meta"}),
+    }
+
+    def fake_get(url, **kwargs):
+        assert kwargs.get("allow_redirects") is False
+        return responses[url]
+
+    monkeypatch.setattr(fetch.requests, "get", fake_get)
+
+    with pytest.raises(Blocked):
+        fetch.validated_tier1_fetch("https://evil.example/", security_check=lambda url: (
+            (_ for _ in ()).throw(Blocked("internal"))
+            if "169.254" in url
+            else None
+        ))
+
+
+def test_tier1_redirect_to_public_host_is_followed(monkeypatch) -> None:
+    class FakeResponse:
+        def __init__(self, status_code, headers=None, text=""):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self.text = text
+            self.is_redirect = status_code in (301, 302, 303, 307, 308)
+
+    responses = {
+        "https://a.example/": FakeResponse(301, {"location": "https://b.example/page"}),
+        "https://b.example/page": FakeResponse(200, text="<article>" + "fine " * 50 + "</article>"),
+    }
+
+    def fake_get(url, **kwargs):
+        return responses[url]
+
+    monkeypatch.setattr(fetch.requests, "get", fake_get)
+
+    html = fetch.validated_tier1_fetch("https://a.example/", security_check=lambda url: None)
+
+    assert "fine" in html
+
+
 def test_fetch_robots_text_returns_none_on_network_error(monkeypatch) -> None:
     def fake_get(url, **kwargs):
         raise OSError("connection refused")

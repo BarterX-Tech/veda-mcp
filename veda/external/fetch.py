@@ -221,8 +221,45 @@ def robots_allowed(url: str, *, fetch_robots) -> bool:
     return parser.can_fetch("*", url)
 
 
+MAX_REDIRECTS = 5
+
+
+def validated_tier1_fetch(
+    url: str,
+    *,
+    security_check=validate_public_http_url,
+    max_redirects: int = MAX_REDIRECTS,
+) -> str | None:
+    """Plain-request fetch that re-validates every redirect hop.
+
+    requests' automatic redirect following would let a public URL bounce
+    into private/metadata address space after the initial SSRF check.
+    """
+    from urllib.parse import urljoin
+
+    current = url
+    for _ in range(max_redirects + 1):
+        security_check(current)
+        rate_limiter.wait()
+        response = requests.get(
+            current, headers=HEADERS, timeout=20, allow_redirects=False
+        )
+        if response.is_redirect:
+            location = response.headers.get("location")
+            if not location:
+                return None
+            current = urljoin(current, location)
+            continue
+        if response.status_code == 200 and response.text:
+            return response.text
+        return None
+    raise Blocked(f"too many redirects for {url}")
+
+
 def _default_fetch_html(url: str, tier: str) -> str | None:
-    return {"tier1": _html_tier1, "tier2": _html_tier2, "tier3": _html_tier3}[tier](url)
+    if tier == "tier1":
+        return validated_tier1_fetch(url)
+    return {"tier2": _html_tier2, "tier3": _html_tier3}[tier](url)
 
 
 def fetch_url(
