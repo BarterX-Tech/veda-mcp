@@ -171,7 +171,10 @@ The software is provided "as is", without warranty of any kind — see
 
 ## Docs
 
-- [Product PRD](docs/PRD.md)
-- [Technical PRD](docs/TECHNICAL_PRD.md)
-- [Integration PRD](docs/INTEGRATION_PRD.md)
+Project documentation lives in the
+[wiki](https://github.com/BarterX-Tech/veda-mcp/wiki):
+
+- [Product PRD](https://github.com/BarterX-Tech/veda-mcp/wiki/Product-PRD)
+- [Technical PRD](https://github.com/BarterX-Tech/veda-mcp/wiki/Technical-PRD)
+- [Integration PRD](https://github.com/BarterX-Tech/veda-mcp/wiki/Integration-PRD)
 - [Security policy](SECURITY.md)

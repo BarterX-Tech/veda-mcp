@@ -1,0 +1,10 @@
+# All changes require approval from the project owner.
+* @nitink133
+
+# Extra-sensitive files called out explicitly (same owner, signals intent).
+/LICENSE @nitink133
+/NOTICE @nitink133
+/SECURITY.md @nitink133
+/CODE_OF_CONDUCT.md @nitink133
+/CONTRIBUTING.md @nitink133
+/.github/ @nitink133

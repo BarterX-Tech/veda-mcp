@@ -29,7 +29,7 @@ scripts/veda-canary   # optional: live probes against real sources
   code, naming, or context. The boundary test enforces the allowed
   dependency set.
 - **Canonical shapes.** Tool results are stable contracts documented in
-  `docs/TECHNICAL_PRD.md` §3. Additive fields are fine; removing or
+  the [Technical PRD](https://github.com/BarterX-Tech/veda-mcp/wiki/Technical-PRD) §3. Additive fields are fine; removing or
   renaming fields is a breaking change and needs discussion first.
 - **No side effects.** Read paths return data; they never write files.
 
