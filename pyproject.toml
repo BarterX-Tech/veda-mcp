@@ -12,7 +12,8 @@ dependencies = [
   "lxml>=5.0",
   "mcp>=1.0",
   "requests>=2.31",
-  "scrapling>=0.2",
+  "scrapling[fetchers]>=0.4",
+  "trafilatura>=1.12",
 ]
 
 [project.optional-dependencies]

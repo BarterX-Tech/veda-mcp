@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_ROOTS = {
     "__future__",
+    "asyncio",
     "collections",
     "contextlib",
     "dataclasses",
@@ -32,6 +33,7 @@ ALLOWED_ROOTS = {
     "mcp",
     "requests",
     "scrapling",
+    "trafilatura",
     "veda",
 }
 FORBIDDEN_TEXT = ("reddit_operator",)

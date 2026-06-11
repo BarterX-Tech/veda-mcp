@@ -101,6 +101,45 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 cache = MemoryCache()
 
+_tier_capabilities_cache: dict[str, dict[str, Any]] | None = None
+
+
+def _probe_tier1() -> None:
+    if not callable(requests.get):  # pragma: no cover - requests is a hard dependency
+        raise RuntimeError("requests unavailable")
+
+
+def _probe_tier2() -> None:
+    from scrapling.fetchers import StealthyFetcher  # noqa: F401
+
+
+def _probe_tier3() -> None:
+    dynamic_fetcher()
+
+
+def tier_capabilities(*, refresh: bool = False) -> dict[str, dict[str, Any]]:
+    """Report which fetch tiers can run in this environment.
+
+    Probes import-time dependencies only; it does not launch browsers.
+    """
+    global _tier_capabilities_cache
+    if _tier_capabilities_cache is not None and not refresh:
+        return _tier_capabilities_cache
+    capabilities: dict[str, dict[str, Any]] = {}
+    for tier, probe in (
+        ("tier1", _probe_tier1),
+        ("tier2", _probe_tier2),
+        ("tier3", _probe_tier3),
+    ):
+        try:
+            probe()
+        except Exception as exc:
+            capabilities[tier] = {"available": False, "detail": f"{type(exc).__name__}: {exc}"}
+        else:
+            capabilities[tier] = {"available": True, "detail": "ok"}
+    _tier_capabilities_cache = capabilities
+    return capabilities
+
 
 def clear_cache() -> None:
     cache.clear()
