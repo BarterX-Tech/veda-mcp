@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="veda-mcp logo" width="160">
+</p>
+
 # veda-mcp
 
 **A standalone MCP server for public Reddit and web reads.** Give it a URL, a
