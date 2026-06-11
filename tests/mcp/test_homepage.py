@@ -110,3 +110,23 @@ def test_bearer_auth_allows_mcp_with_token() -> None:
     )
 
     assert status == 204
+
+
+def test_bearer_auth_rejects_wrong_token() -> None:
+    async def fallback(scope, receive, send):
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    home = BrowserHomePage(fallback, path="/mcp")
+    app = BearerTokenAuth(fallback, token="secret", public_app=home)
+
+    status, _, body = anyio.run(
+        _call_app,
+        app,
+        b"application/json",
+        "POST",
+        b"Bearer wrong-token",
+    )
+
+    assert status == 401
+    assert b"unauthorized" in body

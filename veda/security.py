@@ -10,9 +10,14 @@ from urllib.parse import urlparse
 from veda.errors import Blocked
 
 _BLOCKED_HOSTS = {"localhost", "localhost.localdomain"}
+# Cloud-metadata endpoints are link-local (already non-global), but blocking
+# them by name is defense-in-depth against an is_global regression.
+_BLOCKED_IPS = {"169.254.169.254", "fd00:ec2::254", "100.100.100.200"}
 
 
 def _is_internal_ip(value: str) -> bool:
+    if value in _BLOCKED_IPS:
+        return True
     ip = ipaddress.ip_address(value)
     return not ip.is_global
 

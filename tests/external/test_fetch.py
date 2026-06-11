@@ -292,6 +292,33 @@ def test_fetch_url_blocks_when_robots_disallow() -> None:
         )
 
 
+def test_validate_blocks_cloud_metadata_ip() -> None:
+    with pytest.raises(Blocked):
+        fetch.validate_public_http_url("http://169.254.169.254/latest/meta-data/")
+
+
+def test_validate_blocks_host_resolving_to_metadata_ip() -> None:
+    def resolver(host, port, type):
+        return [(None, None, None, "", ("169.254.169.254", port))]
+
+    with pytest.raises(Blocked):
+        fetch.validate_public_http_url("https://innocent.example/", resolver=resolver)
+
+
+def test_validate_blocks_private_and_ula_literals() -> None:
+    for url in ("http://10.0.0.1/", "http://192.168.1.1/", "http://[fd00::1]/"):
+        with pytest.raises(Blocked):
+            fetch.validate_public_http_url(url)
+
+
+def test_validate_allows_public_host() -> None:
+    def resolver(host, port, type):
+        return [(None, None, None, "", ("93.184.216.34", port))]
+
+    # Should not raise.
+    fetch.validate_public_http_url("https://example.com/page", resolver=resolver)
+
+
 def test_fetch_url_blocks_localhost_target() -> None:
     with pytest.raises(Blocked):
         fetch.fetch_url(

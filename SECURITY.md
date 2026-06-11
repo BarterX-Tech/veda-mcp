@@ -15,9 +15,22 @@ bearer-token authentication:
 
 - The server refuses to start on a non-loopback address without
   `VEDA_AUTH_TOKEN` / `VEDA_TOKEN_FILE` set.
-- `fetch_url` blocks requests to localhost, private, link-local
-  (including cloud metadata), and otherwise non-global addresses, and
-  re-validates every redirect hop on the plain-request route.
+- `fetch_url` blocks requests to localhost, private, link-local, and
+  otherwise non-global addresses. Cloud-metadata endpoints
+  (`169.254.169.254`, `fd00:ec2::254`, `100.100.100.200`) are also denied
+  by name as defense-in-depth.
+- The plain-request (tier1) route follows redirects manually and re-runs
+  the address check on every hop, so a public URL cannot bounce into
+  private or metadata space.
+
+### Known residual: DNS rebinding
+
+The address check resolves the hostname and validates the returned IPs,
+then the HTTP client resolves again to connect. A hostname that returns a
+public IP at check time and a private IP at connect time (DNS rebinding)
+could in principle bypass the tier1 guard. The window is small and the
+service is loopback-only by default; if you expose veda to untrusted
+callers, run it in a network-restricted environment.
 - Browser-based fetch tiers (stealth/dynamic) follow redirects inside the
   browser; if you expose veda to untrusted callers, treat the browser
   tiers as able to reach any address the host machine can reach, and run
