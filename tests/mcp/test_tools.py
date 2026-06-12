@@ -71,6 +71,29 @@ def test_call_tool_runs_core_off_the_event_loop(monkeypatch) -> None:
     assert result["text"] == "ok"
 
 
+def test_tool_error_embeds_code_in_message() -> None:
+    """FastMCP serializes only the message; the code must live in the text."""
+    err = tools.ToolError("boom", code="blocked")
+
+    assert str(err) == "[blocked] boom"
+    assert err.code == "blocked"
+
+
+def test_call_tool_error_message_carries_code(monkeypatch) -> None:
+    health.reset()
+
+    def fail(url, max_chars=20000):
+        raise Blocked("All Reddit thread fetch routes failed")
+
+    monkeypatch.setattr(tools.external_fetch, "fetch_url", fail)
+
+    with pytest.raises(tools.ToolError) as exc:
+        asyncio.run(tools.call_tool("fetch_url", {"url": "https://example.com"}))
+
+    assert "[" + exc.value.code + "]" in str(exc.value)
+    assert str(exc.value) == "[blocked] All Reddit thread fetch routes failed"
+
+
 def test_call_tool_maps_veda_error(monkeypatch) -> None:
     health.reset()
     def fail(url, max_chars=20000):
