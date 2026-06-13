@@ -16,7 +16,7 @@ from veda.security import SlidingWindowRateLimiter
 
 class ToolError(Exception):
     def __init__(self, message: str, *, code: str = "tool_error") -> None:
-        super().__init__(message)
+        super().__init__(f"[{code}] {message}")
         self.code = code
 
 
