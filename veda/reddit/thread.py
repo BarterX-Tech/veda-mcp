@@ -190,6 +190,38 @@ def _normalize_html_comments(comments: list[dict], depth: int = 0) -> list[Comme
     return out
 
 
+def _truncate_comment_tree(comments: list[dict], limit: int) -> list[dict]:
+    """Cap a comment tree to at most ``limit`` real comment nodes (preorder).
+
+    Real comments are dicts without ``_type == "more"`` (the same nodes
+    ``count_stats`` counts as ``fetched``). Walks depth-first, keeping nodes
+    until the budget is exhausted, then drops everything else, including any
+    trailing ``more`` collapse markers. Pure: builds new dicts/lists and does
+    not mutate the input.
+    """
+    remaining = limit
+
+    def walk(items: list[dict]) -> list[dict]:
+        nonlocal remaining
+        out: list[dict] = []
+        for item in items:
+            if remaining <= 0:
+                break
+            if item.get("_type") == "more":
+                # Real comments only count toward the budget; drop trailing
+                # collapse markers once the budget is exhausted (handled by the
+                # remaining<=0 guard above — here we are still within budget).
+                out.append(dict(item))
+                continue
+            remaining -= 1
+            new_item = dict(item)
+            new_item["replies"] = walk(item.get("replies", []))
+            out.append(new_item)
+        return out
+
+    return walk(comments)
+
+
 def count_stats(comments: list[dict]) -> dict[str, int]:
     fetched = 0
     collapsed = 0
@@ -222,11 +254,13 @@ def _shape_html_result(
     source_url: str,
     comment_sort: str,
     rules_fetcher=None,
+    comment_limit: int = 500,
 ) -> ThreadResult:
     post_in = html_result["post"]
     if rules_fetcher is None:
         rules_fetcher = fetch_rules
     html_comments = _normalize_html_comments(html_result.get("comments", []))
+    html_comments = _truncate_comment_tree(html_comments, comment_limit)
     stats = count_stats(html_comments)
     subreddit = post_in.get("subreddit", "")
     post: Post = {
@@ -299,6 +333,7 @@ def fetch_thread(
                 json_url=json_url,
                 source_url=url,
                 comment_sort=comment_sort,
+                comment_limit=comment_limit,
             )
         raise Blocked("All Reddit thread fetch routes failed")
 
