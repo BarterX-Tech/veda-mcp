@@ -170,6 +170,11 @@ def _unwrap(result: Any) -> Any:
     if structured is None:
         structured = getattr(result, "structured_content", None)
     if structured is not None:
+        # FastMCP wraps non-dict tool returns (e.g. fetch_rules' list) as
+        # {"result": ...}. Unbox the single-key wrapper so list-returning tools
+        # honor their contract (Integration PRD §4.3: fetch_rules -> list[Rule]).
+        if isinstance(structured, dict) and set(structured) == {"result"}:
+            return structured["result"]
         return structured
 
     content = getattr(result, "content", None)

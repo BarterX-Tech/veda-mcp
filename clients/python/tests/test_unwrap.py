@@ -46,6 +46,23 @@ def test_unwrap_plain_text_content() -> None:
     assert _unwrap(result) == "plain text"
 
 
+def test_unwrap_unboxes_single_result_key() -> None:
+    # FastMCP wraps non-dict returns (e.g. fetch_rules' list) as {"result": ...};
+    # _unwrap must unbox so list-returning tools honor their contract.
+    result = Result(structuredContent={"result": [{"short_name": "r1"}]})
+
+    assert _unwrap(result) == [{"short_name": "r1"}]
+
+
+def test_unwrap_keeps_dict_with_result_among_other_keys() -> None:
+    # Only a lone {"result": ...} wrapper is unboxed; a real payload that happens
+    # to contain a "result" field alongside others is returned unchanged.
+    payload = {"result": 1, "meta": {}}
+    result = Result(structuredContent=payload)
+
+    assert _unwrap(result) == payload
+
+
 @pytest.mark.parametrize(
     ("message", "error_class", "code", "clean_message"),
     [
