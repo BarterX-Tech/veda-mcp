@@ -22,3 +22,15 @@ jobs:
         run: ruff check .
       - name: Tests
         run: pytest
+      - name: Install Python client
+        run: |
+          cd clients/python
+          python -m pip install -e ".[dev]"
+      - name: Python client Ruff
+        run: |
+          cd clients/python
+          ruff check .
+      - name: Python client Tests
+        run: |
+          cd clients/python
+          pytest

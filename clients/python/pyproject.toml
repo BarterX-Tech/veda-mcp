@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "veda-client"
+version = "0.1.0"
+description = "Small sync Python client for the veda MCP server protocol."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.11"
+keywords = ["mcp", "client", "reddit", "veda"]
+dependencies = [
+  "anyio",
+  "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/BarterX-Tech/veda-mcp"
+Issues = "https://github.com/BarterX-Tech/veda-mcp/issues"
+Repository = "https://github.com/BarterX-Tech/veda-mcp"
+
+[tool.hatch.build.targets.wheel]
+packages = ["veda_client"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

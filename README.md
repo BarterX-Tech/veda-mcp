@@ -150,6 +150,12 @@ http://127.0.0.1:8765/mcp
 If `run/veda-token` exists, configure the client with an
 `Authorization: Bearer` header using that token.
 
+### Python client
+
+This repo also publishes a small standalone Python client distribution,
+`veda-client`, under [clients/python](clients/python). It exposes synchronous
+helpers for the server tools without pulling in veda's scraping dependencies.
+
 ## Development
 
 ```bash
