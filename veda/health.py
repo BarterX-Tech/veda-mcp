@@ -66,14 +66,20 @@ def snapshot() -> dict:
     total_calls = 0
     total_successes = 0
     total_errors = 0
+    blocked = 0
     for metrics in tools.values():
         total_calls += metrics["calls"]
         total_successes += metrics["successes"]
         total_errors += metrics["errors"]
+        blocked += metrics["error_codes"].get("blocked", 0)
         for route, count in metrics["routes"].items():
             route_totals[route] = route_totals.get(route, 0) + count
 
+    error_ratio = round(total_errors / max(total_calls, 1), 3)
+    status = _verdict(total_calls=total_calls, blocked=blocked, error_ratio=error_ratio)
+
     return {
+        "status": status,
         "tools": tools,
         "routes": dict(sorted(route_totals.items())),
         "json_vs_html": {
@@ -89,7 +95,32 @@ def snapshot() -> dict:
             "calls": total_calls,
             "successes": total_successes,
             "errors": total_errors,
+            "blocked": blocked,
+            "error_ratio": error_ratio,
         },
         "scraping_config": get_scraping_config().as_dict(),
         "tiers_available": tier_capabilities(),
     }
+
+
+def _verdict(*, total_calls: int, blocked: int, error_ratio: float) -> str:
+    """Derive a health verdict so callers can threshold on it.
+
+    A liveness check (the server answering at all) only proves the process is up
+    — it stays green during a reddit-wide 403/Cloudflare block while every read
+    fails. Surface that here so a preflight can distinguish "up" from "actually
+    fetching". Counters are cumulative since process start / last reset(), so a
+    long-lived process should reset() periodically for a recent signal.
+
+    - ``idle``: no calls recorded yet (nothing to judge).
+    - ``blocked``: ``blocked`` errors dominate — reddit is refusing reads.
+    - ``degraded``: high overall error ratio (not predominantly blocking).
+    - ``ok``: healthy.
+    """
+    if total_calls == 0:
+        return "idle"
+    if blocked and blocked / total_calls >= 0.5:
+        return "blocked"
+    if error_ratio >= 0.5:
+        return "degraded"
+    return "ok"
